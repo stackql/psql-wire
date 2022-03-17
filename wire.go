@@ -9,6 +9,7 @@ import (
 
 	"github.com/jeroenrinzema/psql-wire/internal/buffer"
 	"github.com/jeroenrinzema/psql-wire/internal/types"
+	"github.com/jeroenrinzema/psql-wire/pkg/sqlbackend"
 	"go.uber.org/zap"
 )
 
@@ -50,6 +51,7 @@ type Server struct {
 	ClientCAs       *x509.CertPool
 	ClientAuth      tls.ClientAuthType
 	SimpleQuery     SimpleQueryFn
+	SQLBackend      sqlbackend.ISQLBackend
 	CloseConn       CloseFn
 	TerminateConn   CloseFn
 	closer          chan struct{}

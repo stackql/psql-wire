@@ -9,6 +9,8 @@ import (
 
 	"github.com/jackc/pgx/v4"
 	"github.com/jeroenrinzema/psql-wire/internal/mock"
+	"github.com/jeroenrinzema/psql-wire/pkg/sqlbackend"
+	"github.com/jeroenrinzema/psql-wire/pkg/sqldata"
 	_ "github.com/lib/pq"
 	"github.com/lib/pq/oid"
 )
@@ -205,4 +207,91 @@ func TestServerWritingResult(t *testing.T) {
 	// 		t.Fatal(err)
 	// 	}
 	// })
+}
+
+func TestSQLBackendServerWritingResult(t *testing.T) {
+	t.Parallel()
+
+	cols := []sqldata.ISQLColumn{ //nolint:errcheck
+		sqldata.NewSQlColumn(
+			sqldata.NewSQLTable(0, ""),
+			"name",
+			0,
+			uint32(oid.T_text),
+			256,
+			0,
+			"TextFormat",
+		),
+		sqldata.NewSQlColumn(
+			sqldata.NewSQLTable(0, ""),
+			"member",
+			0,
+			uint32(oid.T_bool),
+			1,
+			0,
+			"TextFormat",
+		),
+		sqldata.NewSQlColumn(
+			sqldata.NewSQLTable(0, ""),
+			"age",
+			0,
+			uint32(oid.T_int4),
+			1,
+			0,
+			"TextFormat",
+		),
+	}
+
+	rows := []sqldata.ISQLRow{
+		sqldata.NewSQLRow([]interface{}{"John", true, 28}),   //nolint:errcheck
+		sqldata.NewSQLRow([]interface{}{"Marry", false, 21}), //nolint:errcheck
+	}
+
+	sr := sqldata.NewSQLResult(cols, 0, 0, rows)
+
+	sb := sqldata.NewSimpleSQLResultStream(sr)
+
+	qcb := func(context.Context, string) (sqldata.ISQLResultStream, error) {
+		return sb, nil
+	}
+
+	sqlBackend := sqlbackend.NewSimpleSQLBackend(qcb)
+
+	server, err := NewServer(SQLBackend(sqlBackend))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	address := TListenAndServe(t, server)
+
+	t.Run("lib/pq", func(t *testing.T) {
+		connstr := fmt.Sprintf("host=%s port=%d sslmode=disable", address.IP, address.Port)
+		conn, err := sql.Open("postgres", connstr)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		rows, err := conn.Query("SELECT *;")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		for rows.Next() {
+			var name string
+			var member bool
+			var age int
+
+			err := rows.Scan(&name, &member, &age)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			t.Logf("scan result: %s, %d, %t", name, age, member)
+		}
+		err = conn.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	})
+
 }
