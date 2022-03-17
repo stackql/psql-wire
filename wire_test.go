@@ -213,7 +213,7 @@ func TestSQLBackendServerWritingResult(t *testing.T) {
 	t.Parallel()
 
 	cols := []sqldata.ISQLColumn{ //nolint:errcheck
-		sqldata.NewSQlColumn(
+		sqldata.NewSQLColumn(
 			sqldata.NewSQLTable(0, ""),
 			"name",
 			0,
@@ -222,7 +222,7 @@ func TestSQLBackendServerWritingResult(t *testing.T) {
 			0,
 			"TextFormat",
 		),
-		sqldata.NewSQlColumn(
+		sqldata.NewSQLColumn(
 			sqldata.NewSQLTable(0, ""),
 			"member",
 			0,
@@ -231,7 +231,7 @@ func TestSQLBackendServerWritingResult(t *testing.T) {
 			0,
 			"TextFormat",
 		),
-		sqldata.NewSQlColumn(
+		sqldata.NewSQLColumn(
 			sqldata.NewSQLTable(0, ""),
 			"age",
 			0,

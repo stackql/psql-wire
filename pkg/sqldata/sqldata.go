@@ -106,7 +106,7 @@ type SQLColumn struct {
 	format       string
 }
 
-func NewSQlColumn(
+func NewSQLColumn(
 	table ISQLTable,
 	name string,
 	attrNum int16,
