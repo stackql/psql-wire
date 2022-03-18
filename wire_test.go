@@ -155,6 +155,7 @@ func TestServerWritingResult(t *testing.T) {
 			t.Fatal(err)
 		}
 
+		i := 0
 		for rows.Next() {
 			var name string
 			var member bool
@@ -164,8 +165,13 @@ func TestServerWritingResult(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
+			i++
 
 			t.Logf("scan result: %s, %d, %t", name, age, member)
+		}
+
+		if i != 2 {
+			t.Fatal(fmt.Errorf("%d != 2 (actual != expected) rows proceesed ", i))
 		}
 		err = conn.Close()
 		if err != nil {
@@ -276,6 +282,8 @@ func TestSQLBackendServerWritingResult(t *testing.T) {
 			t.Fatal(err)
 		}
 
+		i := 0
+
 		for rows.Next() {
 			var name string
 			var member bool
@@ -285,8 +293,12 @@ func TestSQLBackendServerWritingResult(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
+			i++
 
 			t.Logf("scan result: %s, %d, %t", name, age, member)
+		}
+		if i != 2 {
+			t.Fatal(fmt.Errorf("%d != 2 (actual != expected) rows proceesed ", i))
 		}
 		err = conn.Close()
 		if err != nil {
