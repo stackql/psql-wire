@@ -172,6 +172,7 @@ func (srv *Server) handleSimpleQuery(ctx context.Context, reader *buffer.Reader,
 						srv.writeSQLResultHeader(ctx, res, dw)
 					}
 					srv.writeSQLResultRows(ctx, res, dw)
+					dw.Complete("OK")
 					return nil
 				}
 				return ErrorCode(writer, err)

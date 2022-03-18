@@ -1,6 +1,8 @@
 package sqldata
 
-import "io"
+import (
+	"io"
+)
 
 type ISQLResult interface {
 	GetColumns() []ISQLColumn
