@@ -11,6 +11,8 @@ import (
 	psqlerr "github.com/jeroenrinzema/psql-wire/errors"
 	"github.com/jeroenrinzema/psql-wire/internal/buffer"
 	"github.com/jeroenrinzema/psql-wire/internal/types"
+	"github.com/jeroenrinzema/psql-wire/pkg/sqldata"
+	"github.com/lib/pq/oid"
 	"go.uber.org/zap"
 )
 
@@ -140,7 +142,7 @@ func (srv *Server) handleCommand(ctx context.Context, conn net.Conn, t types.Cli
 }
 
 func (srv *Server) handleSimpleQuery(ctx context.Context, reader *buffer.Reader, writer *buffer.Writer) error {
-	if srv.SimpleQuery == nil {
+	if srv.SimpleQuery == nil && srv.SQLBackend == nil {
 		return ErrorCode(writer, NewErrUnimplementedMessageType(types.ClientSimpleQuery))
 	}
 
@@ -150,6 +152,38 @@ func (srv *Server) handleSimpleQuery(ctx context.Context, reader *buffer.Reader,
 	}
 
 	srv.logger.Debug("incoming query", zap.String("query", query))
+
+	if srv.SQLBackend != nil {
+		rdr, err := srv.SQLBackend.HandleSimpleQuery(ctx, query)
+		if err != nil {
+			return ErrorCode(writer, err)
+		}
+		dw := &dataWriter{
+			ctx:    ctx,
+			client: writer,
+		}
+		var headersWritten bool
+		for {
+			res, err := rdr.Read()
+			if err != nil {
+				if errors.Is(err, io.EOF) {
+					if !headersWritten {
+						headersWritten = true
+						srv.writeSQLResultHeader(ctx, res, dw)
+					}
+					srv.writeSQLResultRows(ctx, res, dw)
+					dw.Complete("OK")
+					return nil
+				}
+				return ErrorCode(writer, err)
+			}
+			if !headersWritten {
+				headersWritten = true
+				dw.Define(nil)
+			}
+			srv.writeSQLResultRows(ctx, res, dw)
+		}
+	}
 
 	err = srv.SimpleQuery(ctx, query, &dataWriter{
 		ctx:    ctx,
@@ -161,6 +195,29 @@ func (srv *Server) handleSimpleQuery(ctx context.Context, reader *buffer.Reader,
 	}
 
 	return nil
+}
+
+func (srv *Server) writeSQLResultRows(ctx context.Context, res sqldata.ISQLResult, writer DataWriter) error {
+	for _, r := range res.GetRows() {
+		writer.Row(r.GetRowDataNaive())
+	}
+	return nil
+}
+
+func (srv *Server) writeSQLResultHeader(ctx context.Context, res sqldata.ISQLResult, writer DataWriter) error {
+	var colz Columns
+	for _, c := range res.GetColumns() {
+		colz = append(colz,
+			Column{
+				Table:  c.GetTableId(),
+				Name:   c.GetName(),
+				Oid:    oid.Oid(c.GetObjectID()),
+				Width:  c.GetWidth(),
+				Format: TextFormat,
+			},
+		)
+	}
+	return writer.Define(colz)
 }
 
 func (srv *Server) handleConnClose(ctx context.Context) error {

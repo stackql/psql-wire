@@ -4,6 +4,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 
+	"github.com/jeroenrinzema/psql-wire/pkg/sqlbackend"
 	"go.uber.org/zap"
 )
 
@@ -15,6 +16,14 @@ type OptionFn func(*Server)
 func SimpleQuery(fn SimpleQueryFn) OptionFn {
 	return func(srv *Server) {
 		srv.SimpleQuery = fn
+	}
+}
+
+// SQLBackend sets the SQL Backend object to
+// handle queries inside the given server instance.
+func SQLBackend(sb sqlbackend.ISQLBackend) OptionFn {
+	return func(srv *Server) {
+		srv.SQLBackend = sb
 	}
 }
 
