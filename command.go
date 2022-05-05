@@ -172,6 +172,10 @@ func (srv *Server) handleSimpleQuery(ctx context.Context, reader *buffer.Reader,
 			for {
 				res, err := rdr.Read()
 				if err != nil {
+					if rdr == nil {
+						dw.Complete("OK")
+						return nil
+					}
 					if errors.Is(err, io.EOF) {
 						if !headersWritten {
 							headersWritten = true
