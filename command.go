@@ -170,12 +170,12 @@ func (srv *Server) handleSimpleQuery(ctx context.Context, reader *buffer.Reader,
 			}
 			var headersWritten bool
 			for {
+				if rdr == nil {
+					dw.Complete("OK")
+					return nil
+				}
 				res, err := rdr.Read()
 				if err != nil {
-					if rdr == nil {
-						dw.Complete("OK")
-						return nil
-					}
 					if errors.Is(err, io.EOF) {
 						if res == nil {
 							dw.Complete("OK")
