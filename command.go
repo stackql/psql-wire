@@ -177,6 +177,10 @@ func (srv *Server) handleSimpleQuery(ctx context.Context, reader *buffer.Reader,
 						return nil
 					}
 					if errors.Is(err, io.EOF) {
+						if res == nil {
+							dw.Complete("OK")
+							return nil
+						}
 						if !headersWritten {
 							headersWritten = true
 							srv.writeSQLResultHeader(ctx, res, dw)
