@@ -35,7 +35,7 @@ func NewSimpleSQLResultStream(res ISQLResult) ISQLResultStream {
 
 func NewChannelSQLResultStream() ISQLResultStream {
 	return &ChannelSQLResultStream{
-		res: make(chan ISQLResult),
+		res: make(chan ISQLResult, 1),
 	}
 }
 
