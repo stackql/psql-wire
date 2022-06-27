@@ -15,6 +15,7 @@ type ISQLResult interface {
 type ISQLResultStream interface {
 	Read() (ISQLResult, error)
 	Write(ISQLResult) error
+	Close() error
 }
 
 type SimpleSQLResultStream struct {
@@ -52,6 +53,15 @@ func (srs *ChannelSQLResultStream) Read() (ISQLResult, error) {
 		err = io.EOF
 	}
 	return rv, err
+}
+
+func (srs *SimpleSQLResultStream) Close() error {
+	return fmt.Errorf("not implemented")
+}
+
+func (srs *ChannelSQLResultStream) Close() error {
+	close(srs.res)
+	return nil
 }
 
 func (srs *ChannelSQLResultStream) Write(r ISQLResult) error {
