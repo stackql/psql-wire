@@ -1,6 +1,7 @@
 package sqldata
 
 import (
+	"fmt"
 	"io"
 )
 
@@ -13,10 +14,15 @@ type ISQLResult interface {
 
 type ISQLResultStream interface {
 	Read() (ISQLResult, error)
+	Write(ISQLResult) error
 }
 
 type SimpleSQLResultStream struct {
 	res ISQLResult
+}
+
+type ChannelSQLResultStream struct {
+	res chan ISQLResult
 }
 
 func NewSimpleSQLResultStream(res ISQLResult) ISQLResultStream {
@@ -25,8 +31,32 @@ func NewSimpleSQLResultStream(res ISQLResult) ISQLResultStream {
 	}
 }
 
+func NewChannelSQLResultStream(res ISQLResult) ISQLResultStream {
+	return &ChannelSQLResultStream{
+		res: make(chan ISQLResult),
+	}
+}
+
 func (srs *SimpleSQLResultStream) Read() (ISQLResult, error) {
 	return srs.res, io.EOF
+}
+
+func (srs *SimpleSQLResultStream) Write(r ISQLResult) error {
+	return fmt.Errorf("not implemented")
+}
+
+func (srs *ChannelSQLResultStream) Read() (ISQLResult, error) {
+	rv, ok := <-srs.res
+	var err error
+	if !ok {
+		err = io.EOF
+	}
+	return rv, err
+}
+
+func (srs *ChannelSQLResultStream) Write(r ISQLResult) error {
+	srs.res <- r
+	return nil
 }
 
 type SQLResult struct {
