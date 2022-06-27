@@ -23,7 +23,8 @@ type SimpleSQLResultStream struct {
 }
 
 type ChannelSQLResultStream struct {
-	res chan ISQLResult
+	res              chan ISQLResult
+	nextResultCached ISQLResult
 }
 
 func NewSimpleSQLResultStream(res ISQLResult) ISQLResultStream {
@@ -47,8 +48,18 @@ func (srs *SimpleSQLResultStream) Write(r ISQLResult) error {
 }
 
 func (srs *ChannelSQLResultStream) Read() (ISQLResult, error) {
-	rv, ok := <-srs.res
+	var rv ISQLResult
 	var err error
+	var ok bool
+	if srs.nextResultCached != nil {
+		rv = srs.nextResultCached
+		srs.nextResultCached, ok = <-srs.res
+	} else {
+		rv, ok = <-srs.res
+		if ok {
+			srs.nextResultCached, ok = <-srs.res
+		}
+	}
 	if !ok {
 		err = io.EOF
 	}
