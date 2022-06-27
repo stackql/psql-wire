@@ -1,6 +1,7 @@
 package sqldata
 
 import (
+	"fmt"
 	"io"
 )
 
@@ -13,10 +14,17 @@ type ISQLResult interface {
 
 type ISQLResultStream interface {
 	Read() (ISQLResult, error)
+	Write(ISQLResult) error
+	Close() error
 }
 
 type SimpleSQLResultStream struct {
 	res ISQLResult
+}
+
+type ChannelSQLResultStream struct {
+	res              chan ISQLResult
+	nextResultCached ISQLResult
 }
 
 func NewSimpleSQLResultStream(res ISQLResult) ISQLResultStream {
@@ -25,8 +33,51 @@ func NewSimpleSQLResultStream(res ISQLResult) ISQLResultStream {
 	}
 }
 
+func NewChannelSQLResultStream() ISQLResultStream {
+	return &ChannelSQLResultStream{
+		res: make(chan ISQLResult, 1),
+	}
+}
+
 func (srs *SimpleSQLResultStream) Read() (ISQLResult, error) {
 	return srs.res, io.EOF
+}
+
+func (srs *SimpleSQLResultStream) Write(r ISQLResult) error {
+	return fmt.Errorf("not implemented")
+}
+
+func (srs *ChannelSQLResultStream) Read() (ISQLResult, error) {
+	var rv ISQLResult
+	var err error
+	var ok bool
+	if srs.nextResultCached != nil {
+		rv = srs.nextResultCached
+		srs.nextResultCached, ok = <-srs.res
+	} else {
+		rv, ok = <-srs.res
+		if ok {
+			srs.nextResultCached, ok = <-srs.res
+		}
+	}
+	if !ok {
+		err = io.EOF
+	}
+	return rv, err
+}
+
+func (srs *SimpleSQLResultStream) Close() error {
+	return fmt.Errorf("not implemented")
+}
+
+func (srs *ChannelSQLResultStream) Close() error {
+	close(srs.res)
+	return nil
+}
+
+func (srs *ChannelSQLResultStream) Write(r ISQLResult) error {
+	srs.res <- r
+	return nil
 }
 
 type SQLResult struct {
