@@ -154,34 +154,49 @@ func (srv *Server) handleSimpleQuery(ctx context.Context, reader *buffer.Reader,
 	srv.logger.Debug("incoming query", zap.String("query", query))
 
 	if srv.SQLBackend != nil {
-		rdr, err := srv.SQLBackend.HandleSimpleQuery(ctx, query)
+
+		qArr, err := srv.SQLBackend.SplitCompoundQuery(query)
 		if err != nil {
-			return ErrorCode(writer, err)
+			return err
 		}
-		dw := &dataWriter{
-			ctx:    ctx,
-			client: writer,
-		}
-		var headersWritten bool
-		for {
-			res, err := rdr.Read()
+		for _, q := range qArr {
+			rdr, err := srv.SQLBackend.HandleSimpleQuery(ctx, q)
 			if err != nil {
-				if errors.Is(err, io.EOF) {
-					if !headersWritten {
-						headersWritten = true
-						srv.writeSQLResultHeader(ctx, res, dw)
-					}
-					srv.writeSQLResultRows(ctx, res, dw)
+				return ErrorCode(writer, err)
+			}
+			dw := &dataWriter{
+				ctx:    ctx,
+				client: writer,
+			}
+			var headersWritten bool
+			for {
+				if rdr == nil {
 					dw.Complete("OK")
 					return nil
 				}
-				return ErrorCode(writer, err)
+				res, err := rdr.Read()
+				if err != nil {
+					if errors.Is(err, io.EOF) {
+						if res == nil {
+							dw.Complete("OK")
+							return nil
+						}
+						if !headersWritten {
+							headersWritten = true
+							srv.writeSQLResultHeader(ctx, res, dw)
+						}
+						srv.writeSQLResultRows(ctx, res, dw)
+						dw.Complete("OK")
+						return nil
+					}
+					return ErrorCode(writer, err)
+				}
+				if !headersWritten {
+					headersWritten = true
+					dw.Define(nil)
+				}
+				srv.writeSQLResultRows(ctx, res, dw)
 			}
-			if !headersWritten {
-				headersWritten = true
-				dw.Define(nil)
-			}
-			srv.writeSQLResultRows(ctx, res, dw)
 		}
 	}
 
