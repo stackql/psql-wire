@@ -31,7 +31,7 @@ func NewSimpleSQLResultStream(res ISQLResult) ISQLResultStream {
 	}
 }
 
-func NewChannelSQLResultStream(res ISQLResult) ISQLResultStream {
+func NewChannelSQLResultStream() ISQLResultStream {
 	return &ChannelSQLResultStream{
 		res: make(chan ISQLResult),
 	}
