@@ -10,6 +10,7 @@ import (
 	"github.com/jeroenrinzema/psql-wire/internal/buffer"
 	"github.com/jeroenrinzema/psql-wire/internal/types"
 	"github.com/jeroenrinzema/psql-wire/pkg/sqlbackend"
+	"github.com/sirupsen/logrus"
 	"go.uber.org/zap"
 )
 
@@ -29,7 +30,7 @@ func ListenAndServe(address string, handler SimpleQueryFn) error {
 // NewServer constructs a new Postgres server using the given address and server options.
 func NewServer(options ...OptionFn) (*Server, error) {
 	srv := &Server{
-		logger: zap.NewNop(),
+		logger: logrus.StandardLogger(),
 		closer: make(chan struct{}),
 	}
 
@@ -43,7 +44,7 @@ func NewServer(options ...OptionFn) (*Server, error) {
 // Server contains options for listening to an address.
 type Server struct {
 	wg              sync.WaitGroup
-	logger          *zap.Logger
+	logger          *logrus.Logger
 	Auth            AuthStrategy
 	BufferedMsgSize int
 	Parameters      Parameters
