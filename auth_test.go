@@ -9,7 +9,7 @@ import (
 
 	"github.com/jeroenrinzema/psql-wire/internal/buffer"
 	"github.com/jeroenrinzema/psql-wire/internal/types"
-	"go.uber.org/zap"
+	"github.com/sirupsen/logrus"
 )
 
 func TestDefaultHandleAuth(t *testing.T) {
@@ -20,7 +20,7 @@ func TestDefaultHandleAuth(t *testing.T) {
 	reader := buffer.NewReader(input, buffer.DefaultBufferSize)
 	writer := buffer.NewWriter(sink)
 
-	server := &Server{logger: zap.NewNop()}
+	server := &Server{logger: logrus.StandardLogger()}
 	err := server.handleAuth(ctx, reader, writer)
 	if err != nil {
 		t.Fatal(err)
@@ -76,7 +76,7 @@ func TestClearTextPassword(t *testing.T) {
 	reader := buffer.NewReader(input, buffer.DefaultBufferSize)
 	writer := buffer.NewWriter(sink)
 
-	server := &Server{logger: zap.NewNop(), Auth: ClearTextPassword(validate)}
+	server := &Server{logger: logrus.StandardLogger(), Auth: ClearTextPassword(validate)}
 	err := server.handleAuth(ctx, reader, writer)
 	if err != nil {
 		t.Error("unexpected error:", err)

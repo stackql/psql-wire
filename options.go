@@ -5,7 +5,7 @@ import (
 	"crypto/x509"
 
 	"github.com/jeroenrinzema/psql-wire/pkg/sqlbackend"
-	"go.uber.org/zap"
+	"github.com/sirupsen/logrus"
 )
 
 // OptionFn options pattern used to define and set options for the given
@@ -83,7 +83,7 @@ func GlobalParameters(params Parameters) OptionFn {
 }
 
 // Logger sets the given zap logger as the default logger for the given server.
-func Logger(logger *zap.Logger) OptionFn {
+func Logger(logger *logrus.Logger) OptionFn {
 	return func(srv *Server) {
 		srv.logger = logger
 	}
