@@ -93,6 +93,9 @@ func NewSQLResult(
 	insertID uint64,
 	rows []ISQLRow,
 ) *SQLResult {
+	if rows == nil {
+		rows = []ISQLRow{}
+	}
 	return &SQLResult{
 		columns:      columns,
 		rowsAffected: rowsAffected,
