@@ -171,7 +171,7 @@ func (srv *Server) handleSimpleQuery(ctx context.Context, reader *buffer.Reader,
 			var headersWritten bool
 			for {
 				if rdr == nil {
-					dw.Complete("OK")
+					dw.Empty()
 					return nil
 				}
 				res, err := rdr.Read()
