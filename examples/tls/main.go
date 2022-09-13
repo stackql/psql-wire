@@ -5,7 +5,7 @@ import (
 	"crypto/tls"
 
 	wire "github.com/jeroenrinzema/psql-wire"
-	"go.uber.org/zap"
+	"github.com/sirupsen/logrus"
 )
 
 func main() {
@@ -16,10 +16,7 @@ func main() {
 }
 
 func run() error {
-	logger, err := zap.NewDevelopment()
-	if err != nil {
-		return err
-	}
+	logger := logrus.New()
 
 	cert, err := tls.LoadX509KeyPair("./psql.crt", "./psql.key")
 	if err != nil {

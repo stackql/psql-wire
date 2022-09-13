@@ -178,7 +178,7 @@ func (srv *Server) handleSimpleQuery(ctx context.Context, reader *buffer.Reader,
 				if err != nil {
 					if errors.Is(err, io.EOF) {
 						if res == nil {
-							dw.Complete("OK")
+							dw.Empty()
 							return nil
 						}
 						if !headersWritten {
