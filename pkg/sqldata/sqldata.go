@@ -225,8 +225,8 @@ func (sr *SQLRow) GetRowDataNaive() []interface{} {
 	var rv []interface{}
 	for _, val := range sr.rawData {
 		switch v := val.(type) {
-		case string:
-			rv = append(rv, &v)
+		case []uint8:
+			rv = append(rv, string(v))
 		default:
 			rv = append(rv, v)
 		}
