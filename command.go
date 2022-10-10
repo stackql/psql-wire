@@ -214,7 +214,7 @@ func (srv *Server) handleSimpleQuery(ctx context.Context, reader *buffer.Reader,
 
 func (srv *Server) writeSQLResultRows(ctx context.Context, res sqldata.ISQLResult, writer DataWriter) error {
 	for _, r := range res.GetRows() {
-		writer.Row(r.GetRowDataNaive())
+		writer.Row(r.GetRowDataForPgWire())
 	}
 	return nil
 }

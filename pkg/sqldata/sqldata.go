@@ -209,6 +209,7 @@ func (sc *SQLColumn) GetFormat() string {
 
 type ISQLRow interface {
 	GetRowDataNaive() []interface{}
+	GetRowDataForPgWire() []interface{}
 }
 
 type SQLRow struct {
@@ -223,4 +224,17 @@ func NewSQLRow(rawData []interface{}) ISQLRow {
 
 func (sr *SQLRow) GetRowDataNaive() []interface{} {
 	return sr.rawData
+}
+
+func (sr *SQLRow) GetRowDataForPgWire() []interface{} {
+	var rv []interface{}
+	for _, val := range sr.rawData {
+		switch v := val.(type) {
+		case []uint8:
+			rv = append(rv, string(v))
+		default:
+			rv = append(rv, v)
+		}
+	}
+	return rv
 }

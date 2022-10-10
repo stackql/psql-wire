@@ -4,7 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
+	"github.com/jackc/pgtype"
 	"github.com/jeroenrinzema/psql-wire/internal/buffer"
 	"github.com/jeroenrinzema/psql-wire/internal/types"
 	"github.com/lib/pq/oid"
@@ -92,6 +94,16 @@ func (column Column) Write(ctx context.Context, writer *buffer.Writer, src inter
 		return fmt.Errorf("unknown data type: %T", column)
 	}
 
+	switch typed.Value.(type) {
+	case *pgtype.Bool:
+		switch s := src.(type) {
+		case string:
+			if strings.ToLower(s) == "null" {
+				var s2 *bool
+				src = s2
+			}
+		}
+	}
 	err = typed.Value.Set(src)
 	if err != nil {
 		return err
