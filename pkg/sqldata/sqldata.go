@@ -222,5 +222,14 @@ func NewSQLRow(rawData []interface{}) ISQLRow {
 }
 
 func (sr *SQLRow) GetRowDataNaive() []interface{} {
-	return sr.rawData
+	var rv []interface{}
+	for _, val := range sr.rawData {
+		switch v := val.(type) {
+		case string:
+			rv = append(rv, &v)
+		default:
+			rv = append(rv, v)
+		}
+	}
+	return rv
 }
