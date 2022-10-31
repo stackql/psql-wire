@@ -1,6 +1,7 @@
 package sqldata
 
 import (
+	"database/sql/driver"
 	"fmt"
 	"io"
 )
@@ -232,6 +233,9 @@ func (sr *SQLRow) GetRowDataForPgWire() []interface{} {
 		switch v := val.(type) {
 		case []uint8:
 			rv = append(rv, string(v))
+		case driver.Valuer:
+			tv, _ := v.Value()
+			rv = append(rv, tv)
 		default:
 			rv = append(rv, v)
 		}
