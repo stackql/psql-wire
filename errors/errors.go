@@ -1,6 +1,6 @@
 package errors
 
-import "github.com/jeroenrinzema/psql-wire/codes"
+import "github.com/stackql/psql-wire/codes"
 
 // Error contains all Postgres wire protocol error fields.
 // See https://www.postgresql.org/docs/current/static/protocol-error-fields.html

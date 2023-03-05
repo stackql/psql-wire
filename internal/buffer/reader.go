@@ -7,7 +7,7 @@ import (
 	"io"
 	"unsafe"
 
-	"github.com/jeroenrinzema/psql-wire/internal/types"
+	"github.com/stackql/psql-wire/internal/types"
 )
 
 // DefaultBufferSize represents the default buffer size whenever the buffer size

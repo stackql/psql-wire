@@ -8,11 +8,11 @@ import (
 	"testing"
 
 	"github.com/jackc/pgx/v4"
-	"github.com/jeroenrinzema/psql-wire/internal/mock"
-	"github.com/jeroenrinzema/psql-wire/pkg/sqlbackend"
-	"github.com/jeroenrinzema/psql-wire/pkg/sqldata"
 	_ "github.com/lib/pq"
 	"github.com/lib/pq/oid"
+	"github.com/stackql/psql-wire/internal/mock"
+	"github.com/stackql/psql-wire/pkg/sqlbackend"
+	"github.com/stackql/psql-wire/pkg/sqldata"
 )
 
 // TListenAndServe will open a new TCP listener on a unallocated port inside

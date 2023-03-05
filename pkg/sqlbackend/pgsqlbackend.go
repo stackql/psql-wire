@@ -3,7 +3,7 @@ package sqlbackend
 import (
 	"context"
 
-	"github.com/jeroenrinzema/psql-wire/pkg/sqldata"
+	"github.com/stackql/psql-wire/pkg/sqldata"
 )
 
 type QueryCallback func(context.Context, string) (sqldata.ISQLResultStream, error)

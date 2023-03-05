@@ -6,8 +6,8 @@ import (
 	"errors"
 	"net"
 
-	"github.com/jeroenrinzema/psql-wire/internal/buffer"
-	"github.com/jeroenrinzema/psql-wire/internal/types"
+	"github.com/stackql/psql-wire/internal/buffer"
+	"github.com/stackql/psql-wire/internal/types"
 	"go.uber.org/zap"
 )
 

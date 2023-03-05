@@ -5,7 +5,7 @@ import (
 	"net"
 	"testing"
 
-	"github.com/jeroenrinzema/psql-wire/internal/types"
+	"github.com/stackql/psql-wire/internal/types"
 )
 
 func NewClient(conn net.Conn) *Client {

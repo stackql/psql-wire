@@ -4,8 +4,8 @@ import (
 	"context"
 	"crypto/tls"
 
-	wire "github.com/jeroenrinzema/psql-wire"
 	"github.com/sirupsen/logrus"
+	wire "github.com/stackql/psql-wire"
 )
 
 func main() {

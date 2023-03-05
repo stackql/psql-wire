@@ -4,8 +4,8 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 
-	"github.com/jeroenrinzema/psql-wire/pkg/sqlbackend"
 	"github.com/sirupsen/logrus"
+	"github.com/stackql/psql-wire/pkg/sqlbackend"
 )
 
 // OptionFn options pattern used to define and set options for the given

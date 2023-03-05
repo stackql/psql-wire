@@ -1,15 +1,16 @@
 package wire
 
 import (
-	psqlerr "github.com/jeroenrinzema/psql-wire/errors"
-	"github.com/jeroenrinzema/psql-wire/internal/buffer"
-	"github.com/jeroenrinzema/psql-wire/internal/types"
+	psqlerr "github.com/stackql/psql-wire/errors"
+	"github.com/stackql/psql-wire/internal/buffer"
+	"github.com/stackql/psql-wire/internal/types"
 )
 
 // errFieldType represents the error fields.
 type errFieldType byte
 
 // http://www.postgresql.org/docs/current/static/protocol-error-fields.html
+//
 //nolint:varcheck,deadcode
 const (
 	errFieldSeverity       errFieldType = 'S'
