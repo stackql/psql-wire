@@ -7,9 +7,9 @@ import (
 	"strings"
 
 	"github.com/jackc/pgtype"
-	"github.com/jeroenrinzema/psql-wire/internal/buffer"
-	"github.com/jeroenrinzema/psql-wire/internal/types"
 	"github.com/lib/pq/oid"
+	"github.com/stackql/psql-wire/internal/buffer"
+	"github.com/stackql/psql-wire/internal/types"
 )
 
 // Columns represent a collection of columns

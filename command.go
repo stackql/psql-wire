@@ -7,12 +7,12 @@ import (
 	"io"
 	"net"
 
-	"github.com/jeroenrinzema/psql-wire/codes"
-	psqlerr "github.com/jeroenrinzema/psql-wire/errors"
-	"github.com/jeroenrinzema/psql-wire/internal/buffer"
-	"github.com/jeroenrinzema/psql-wire/internal/types"
-	"github.com/jeroenrinzema/psql-wire/pkg/sqldata"
 	"github.com/lib/pq/oid"
+	"github.com/stackql/psql-wire/codes"
+	psqlerr "github.com/stackql/psql-wire/errors"
+	"github.com/stackql/psql-wire/internal/buffer"
+	"github.com/stackql/psql-wire/internal/types"
+	"github.com/stackql/psql-wire/pkg/sqldata"
 	"go.uber.org/zap"
 )
 

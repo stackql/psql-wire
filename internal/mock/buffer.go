@@ -3,8 +3,8 @@ package mock
 import (
 	"io"
 
-	"github.com/jeroenrinzema/psql-wire/internal/buffer"
-	"github.com/jeroenrinzema/psql-wire/internal/types"
+	"github.com/stackql/psql-wire/internal/buffer"
+	"github.com/stackql/psql-wire/internal/types"
 )
 
 // NewWriter constructs a new PostgreSQL wire protocol writer.

@@ -4,8 +4,8 @@ import (
 	"context"
 	"log"
 
-	wire "github.com/jeroenrinzema/psql-wire"
 	"github.com/lib/pq/oid"
+	wire "github.com/stackql/psql-wire"
 )
 
 func main() {

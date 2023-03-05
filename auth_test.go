@@ -7,9 +7,9 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/jeroenrinzema/psql-wire/internal/buffer"
-	"github.com/jeroenrinzema/psql-wire/internal/types"
 	"github.com/sirupsen/logrus"
+	"github.com/stackql/psql-wire/internal/buffer"
+	"github.com/stackql/psql-wire/internal/types"
 )
 
 func TestDefaultHandleAuth(t *testing.T) {
