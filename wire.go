@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"fmt"
 	"net"
 	"sync"
 
@@ -43,19 +44,27 @@ func NewServer(options ...OptionFn) (*Server, error) {
 
 // Server contains options for listening to an address.
 type Server struct {
-	wg              sync.WaitGroup
-	logger          *logrus.Logger
-	Auth            AuthStrategy
-	BufferedMsgSize int
-	Parameters      Parameters
-	Certificates    []tls.Certificate
-	ClientCAs       *x509.CertPool
-	ClientAuth      tls.ClientAuthType
-	SimpleQuery     SimpleQueryFn
-	SQLBackend      sqlbackend.ISQLBackend
-	CloseConn       CloseFn
-	TerminateConn   CloseFn
-	closer          chan struct{}
+	wg                sync.WaitGroup
+	logger            *logrus.Logger
+	Auth              AuthStrategy
+	BufferedMsgSize   int
+	Parameters        Parameters
+	Certificates      []tls.Certificate
+	ClientCAs         *x509.CertPool
+	ClientAuth        tls.ClientAuthType
+	SimpleQuery       SimpleQueryFn
+	SQLBackendFactory sqlbackend.SQLBackendFactory
+	CloseConn         CloseFn
+	TerminateConn     CloseFn
+	closer            chan struct{}
+}
+
+func (srv *Server) CreateSQLBackend() (sqlbackend.ISQLBackend, error) {
+	if srv.SQLBackendFactory == nil {
+		return nil, fmt.Errorf("no sql backend factory provided")
+	}
+
+	return srv.SQLBackendFactory.NewSQLBackend()
 }
 
 // ListenAndServe opens a new Postgres server on the preconfigured address and
@@ -145,7 +154,22 @@ func (srv *Server) serve(ctx context.Context, conn net.Conn) error {
 		return err
 	}
 
-	return srv.consumeCommands(ctx, conn, reader, writer)
+	sqlBackend, err := srv.CreateSQLBackend()
+
+	if err != nil {
+		srv.logger.Debugf("no sql backend found, using default backend\n")
+	}
+
+	cn := NewSQLConnection(
+		0,
+		conn,
+		reader,
+		writer,
+		sqlBackend,
+	)
+
+	// this should be a function of connection, not server
+	return srv.consumeCommands(ctx, cn)
 }
 
 // Close gracefully closes the underlaying Postgres server.

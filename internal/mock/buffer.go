@@ -16,7 +16,7 @@ func NewWriter(writer io.Writer) *Writer {
 // write messages using the PostgreSQL wire protocol. This implementation is
 // mainly used for mocking/testing purposes.
 type Writer struct {
-	*buffer.Writer
+	buffer.Writer
 }
 
 // Start resets the buffer writer and starts a new message with the given
@@ -36,7 +36,7 @@ func NewReader(reader io.Reader) *Reader {
 // read messages through the PostgreSQL wire protocol. This implementation is
 // mainly used for mocking/testing purposes.
 type Reader struct {
-	*buffer.Reader
+	buffer.Reader
 }
 
 // ReadTypedMsg reads a message from the provided reader, returning its type code and body.

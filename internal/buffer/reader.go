@@ -10,6 +10,10 @@ import (
 	"github.com/stackql/psql-wire/internal/types"
 )
 
+var (
+	_ Reader = (*simpleReader)(nil)
+)
+
 // DefaultBufferSize represents the default buffer size whenever the buffer size
 // is not set or a negative value is presented.
 const DefaultBufferSize = 1 << 24 // 16777216 bytes
@@ -22,15 +26,39 @@ type BufferedReader interface {
 }
 
 // Reader provides a convenient way to read pgwire protocol messages
-type Reader struct {
+type Reader interface {
+	GetString() (string, error)
+	GetBytes(int) ([]byte, error)
+	GetUint16() (uint16, error)
+	GetUint32() (uint32, error)
+	GetPrepareType() (PrepareType, error)
+	ReadTypedMsg() (types.ClientMessage, int, error)
+
+	ReadUntypedMsg() (int, error)
+
+	Slurp(size int) error
+
+	//
+	ResetReader(size int)
+	PeekMsg() []byte
+}
+
+type simpleReader struct {
 	Buffer         BufferedReader
 	Msg            []byte
 	MaxMessageSize int
 	header         [4]byte
 }
 
+func CreateTestReader(msg []byte, buffer BufferedReader) Reader {
+	return &simpleReader{
+		Buffer: buffer,
+		Msg:    msg,
+	}
+}
+
 // NewReader constructs a new Postgres wire buffer for the given io.Reader
-func NewReader(reader io.Reader, bufferSize int) *Reader {
+func NewReader(reader io.Reader, bufferSize int) Reader {
 	if reader == nil {
 		return nil
 	}
@@ -39,16 +67,20 @@ func NewReader(reader io.Reader, bufferSize int) *Reader {
 		bufferSize = DefaultBufferSize
 	}
 
-	return &Reader{
+	return &simpleReader{
 		Buffer:         bufio.NewReaderSize(reader, bufferSize),
 		MaxMessageSize: bufferSize,
 	}
 }
 
-// reset sets reader.Msg to exactly size, attempting to use spare capacity
+func (reader *simpleReader) PeekMsg() []byte {
+	return reader.Msg
+}
+
+// ResetReader sets reader.Msg to exactly size, attempting to use spare capacity
 // at the end of the existing slice when possible and allocating a new
 // slice when necessary.
-func (reader *Reader) reset(size int) {
+func (reader *simpleReader) ResetReader(size int) {
 	if reader.Msg != nil {
 		reader.Msg = reader.Msg[len(reader.Msg):]
 	}
@@ -67,7 +99,7 @@ func (reader *Reader) reset(size int) {
 
 // ReadTypedMsg reads a message from the provided reader, returning its type code and body.
 // It returns the message type, number of bytes read, and an error if there was one.
-func (reader *Reader) ReadTypedMsg() (types.ClientMessage, int, error) {
+func (reader *simpleReader) ReadTypedMsg() (types.ClientMessage, int, error) {
 	b, err := reader.Buffer.ReadByte()
 	if err != nil {
 		return 0, 0, err
@@ -82,7 +114,7 @@ func (reader *Reader) ReadTypedMsg() (types.ClientMessage, int, error) {
 }
 
 // Slurp reads the remaining
-func (reader *Reader) Slurp(size int) error {
+func (reader *simpleReader) Slurp(size int) error {
 	remaining := size
 	for remaining > 0 {
 		reading := remaining
@@ -91,7 +123,7 @@ func (reader *Reader) Slurp(size int) error {
 			reading = reader.MaxMessageSize
 		}
 
-		reader.reset(reading)
+		reader.ResetReader(reading)
 
 		n, err := io.ReadFull(reader.Buffer, reader.Msg)
 		if err != nil {
@@ -113,7 +145,7 @@ func (reader *Reader) Slurp(size int) error {
 //
 // If the error is related to consuming a buffer that is larger than the
 // maxMessageSize, the remaining bytes will be read but discarded.
-func (reader *Reader) ReadUntypedMsg() (int, error) {
+func (reader *simpleReader) ReadUntypedMsg() (int, error) {
 	nread, err := io.ReadFull(reader.Buffer, reader.header[:])
 	if err != nil {
 		return nread, err
@@ -127,13 +159,13 @@ func (reader *Reader) ReadUntypedMsg() (int, error) {
 		return nread, NewMessageSizeExceeded(reader.MaxMessageSize, size)
 	}
 
-	reader.reset(size)
+	reader.ResetReader(size)
 	n, err := io.ReadFull(reader.Buffer, reader.Msg)
 	return nread + n, err
 }
 
 // GetString reads a null-terminated string.
-func (reader *Reader) GetString() (string, error) {
+func (reader *simpleReader) GetString() (string, error) {
 	pos := bytes.IndexByte(reader.Msg, 0)
 	if pos == -1 {
 		return "", NewMissingNulTerminator()
@@ -148,7 +180,7 @@ func (reader *Reader) GetString() (string, error) {
 }
 
 // GetPrepareType returns the buffer's contents as a PrepareType.
-func (reader *Reader) GetPrepareType() (PrepareType, error) {
+func (reader *simpleReader) GetPrepareType() (PrepareType, error) {
 	v, err := reader.GetBytes(1)
 	if err != nil {
 		return 0, err
@@ -158,7 +190,7 @@ func (reader *Reader) GetPrepareType() (PrepareType, error) {
 }
 
 // GetBytes returns the buffer's contents as a []byte.
-func (reader *Reader) GetBytes(n int) ([]byte, error) {
+func (reader *simpleReader) GetBytes(n int) ([]byte, error) {
 	if len(reader.Msg) < n {
 		return nil, NewInsufficientData(len(reader.Msg))
 	}
@@ -169,7 +201,7 @@ func (reader *Reader) GetBytes(n int) ([]byte, error) {
 }
 
 // GetUint16 returns the buffer's contents as a uint16.
-func (reader *Reader) GetUint16() (uint16, error) {
+func (reader *simpleReader) GetUint16() (uint16, error) {
 	if len(reader.Msg) < 2 {
 		return 0, NewInsufficientData(len(reader.Msg))
 	}
@@ -180,7 +212,7 @@ func (reader *Reader) GetUint16() (uint16, error) {
 }
 
 // GetUint32 returns the buffer's contents as a uint32.
-func (reader *Reader) GetUint32() (uint32, error) {
+func (reader *simpleReader) GetUint32() (uint32, error) {
 	if len(reader.Msg) < 4 {
 		return 0, NewInsufficientData(len(reader.Msg))
 	}
