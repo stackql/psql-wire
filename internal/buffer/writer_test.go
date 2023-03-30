@@ -41,7 +41,7 @@ func TestWriteMsgErr(t *testing.T) {
 	writer := NewWriter(buffer)
 
 	writer.Start(types.ServerDataRow)
-	writer.err = expected
+	writer.SetError(expected)
 
 	writer.AddString("John Doe")
 	writer.AddNullTerminate()
@@ -105,7 +105,7 @@ func TestWriteTypesErr(t *testing.T) {
 
 	buffer := bytes.NewBuffer([]byte{})
 	writer := NewWriter(buffer)
-	writer.err = expected
+	writer.SetError(expected)
 
 	t.Run("byte", func(t *testing.T) {
 		writer.AddByte(byte(types.ServerAuth))

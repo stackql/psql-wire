@@ -145,7 +145,16 @@ func (srv *Server) serve(ctx context.Context, conn net.Conn) error {
 		return err
 	}
 
-	return srv.consumeCommands(ctx, conn, reader, writer)
+	cn := NewSQLConnection(
+		0,
+		conn,
+		reader,
+		writer,
+		srv.SQLBackend,
+	)
+
+	// this should be a function of connection, not server
+	return srv.consumeCommands(ctx, cn)
 }
 
 // Close gracefully closes the underlaying Postgres server.

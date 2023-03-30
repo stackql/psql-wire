@@ -11,10 +11,17 @@ type QueryCallback func(context.Context, string) (sqldata.ISQLResultStream, erro
 type ISQLBackend interface {
 	HandleSimpleQuery(context.Context, string) (sqldata.ISQLResultStream, error)
 	SplitCompoundQuery(string) ([]string, error)
+	CloneSQLBackend() ISQLBackend
 }
 
 type SimpleSQLBackend struct {
 	simpleCallback QueryCallback
+}
+
+func (sb *SimpleSQLBackend) CloneSQLBackend() ISQLBackend {
+	return &SimpleSQLBackend{
+		simpleCallback: sb.simpleCallback,
+	}
 }
 
 func (sb *SimpleSQLBackend) HandleSimpleQuery(ctx context.Context, query string) (sqldata.ISQLResultStream, error) {

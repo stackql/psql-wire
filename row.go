@@ -18,7 +18,7 @@ type Columns []Column
 // Define writes the table RowDescription headers for the given table and the containing
 // columns. The headers have to be written before any data rows could be send back
 // to the client.
-func (columns Columns) Define(ctx context.Context, writer *buffer.Writer) error {
+func (columns Columns) Define(ctx context.Context, writer buffer.Writer) error {
 	writer.Start(types.ServerRowDescription)
 	writer.AddInt16(int16(len(columns)))
 
@@ -31,7 +31,7 @@ func (columns Columns) Define(ctx context.Context, writer *buffer.Writer) error 
 
 // Write writes the given column values back to the client using the predefined
 // table column types and format encoders (text/binary).
-func (columns Columns) Write(ctx context.Context, writer *buffer.Writer, srcs []interface{}) (err error) {
+func (columns Columns) Write(ctx context.Context, writer buffer.Writer, srcs []interface{}) (err error) {
 	if len(srcs) != len(columns) {
 		return fmt.Errorf("unexpected columns, %d columns are defined inside the given table but %d were given", len(columns), len(srcs))
 	}
@@ -65,7 +65,7 @@ type Column struct {
 // Define writes the column header values to the given writer.
 // This method is used to define a column inside RowDescription message defining
 // the column type, width, and name.
-func (column Column) Define(ctx context.Context, writer *buffer.Writer) {
+func (column Column) Define(ctx context.Context, writer buffer.Writer) {
 	writer.AddString(column.Name)
 	writer.AddNullTerminate()
 	writer.AddInt32(column.Table)
@@ -79,7 +79,7 @@ func (column Column) Define(ctx context.Context, writer *buffer.Writer) {
 // Write encodes the given source value using the column type definition and connection
 // info. The encoded byte buffer is added to the given write buffer. This method
 // Is used to encode values and return them inside a DataRow message.
-func (column Column) Write(ctx context.Context, writer *buffer.Writer, src interface{}) (err error) {
+func (column Column) Write(ctx context.Context, writer buffer.Writer, src interface{}) (err error) {
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}

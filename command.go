@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"net"
 
 	"github.com/lib/pq/oid"
 	"github.com/stackql/psql-wire/codes"
@@ -33,26 +32,26 @@ type CloseFn func(ctx context.Context) error
 // Responses for the given message type are written back to the client.
 // This method keeps consuming messages until the client issues a close message
 // or the connection is terminated.
-func (srv *Server) consumeCommands(ctx context.Context, conn net.Conn, reader *buffer.Reader, writer *buffer.Writer) (err error) {
+func (srv *Server) consumeCommands(ctx context.Context, conn SQLConnection) (err error) {
 	srv.logger.Debug("ready for query... starting to consume commands")
 
 	// TODO(Jeroen): include a indentification value inside the context that
 	// could be used to identify connections at a later stage.
 
 	for {
-		err = readyForQuery(writer, types.ServerIdle)
+		err = readyForQuery(conn, types.ServerIdle)
 		if err != nil {
 			return err
 		}
 
-		t, length, err := reader.ReadTypedMsg()
+		t, length, err := conn.ReadTypedMsg()
 		if err == io.EOF {
 			return nil
 		}
 
 		// NOTE(Jeroen): we could recover from this scenario
 		if errors.Is(err, buffer.ErrMessageSizeExceeded) {
-			err = srv.handleMessageSizeExceeded(reader, writer, err)
+			err = srv.handleMessageSizeExceeded(conn, conn, err)
 			if err != nil {
 				return err
 			}
@@ -66,7 +65,7 @@ func (srv *Server) consumeCommands(ctx context.Context, conn net.Conn, reader *b
 			return err
 		}
 
-		err = srv.handleCommand(ctx, conn, t, reader, writer)
+		err = srv.handleCommand(ctx, conn, t)
 		if err != nil {
 			return err
 		}
@@ -82,7 +81,7 @@ func (srv *Server) consumeCommands(ctx context.Context, conn net.Conn, reader *b
 // type. A fatal error is returned when an unexpected error is returned while
 // consuming the expected message size or when attempting to write the error
 // message back to the client.
-func (srv *Server) handleMessageSizeExceeded(reader *buffer.Reader, writer *buffer.Writer, exceeded error) (err error) {
+func (srv *Server) handleMessageSizeExceeded(reader buffer.Reader, writer buffer.Writer, exceeded error) (err error) {
 	unwrapped, has := buffer.UnwrapMessageSizeExceeded(exceeded)
 	if !has {
 		return exceeded
@@ -99,7 +98,7 @@ func (srv *Server) handleMessageSizeExceeded(reader *buffer.Reader, writer *buff
 // handleCommand handles the given client message. A client message includes a
 // message type and reader buffer containing the actual message. The type
 // indecates a action executed by the client.
-func (srv *Server) handleCommand(ctx context.Context, conn net.Conn, t types.ClientMessage, reader *buffer.Reader, writer *buffer.Writer) (err error) {
+func (srv *Server) handleCommand(ctx context.Context, conn SQLConnection, t types.ClientMessage) (err error) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
@@ -107,7 +106,8 @@ func (srv *Server) handleCommand(ctx context.Context, conn net.Conn, t types.Cli
 	case types.ClientSync:
 		// TODO(Jeroen): client sync received
 	case types.ClientSimpleQuery:
-		return srv.handleSimpleQuery(ctx, reader, writer)
+		// TODO: make this a function of connection
+		return srv.handleSimpleQuery(ctx, conn)
 	case types.ClientExecute:
 	case types.ClientParse:
 	case types.ClientDescribe:
@@ -135,18 +135,18 @@ func (srv *Server) handleCommand(ctx context.Context, conn net.Conn, t types.Cli
 
 		return conn.Close()
 	default:
-		return ErrorCode(writer, NewErrUnimplementedMessageType(t))
+		return ErrorCode(conn, NewErrUnimplementedMessageType(t))
 	}
 
 	return nil
 }
 
-func (srv *Server) handleSimpleQuery(ctx context.Context, reader *buffer.Reader, writer *buffer.Writer) error {
+func (srv *Server) handleSimpleQuery(ctx context.Context, cn SQLConnection) error {
 	if srv.SimpleQuery == nil && srv.SQLBackend == nil {
-		return ErrorCode(writer, NewErrUnimplementedMessageType(types.ClientSimpleQuery))
+		return ErrorCode(cn, NewErrUnimplementedMessageType(types.ClientSimpleQuery))
 	}
 
-	query, err := reader.GetString()
+	query, err := cn.GetString()
 	if err != nil {
 		return err
 	}
@@ -162,11 +162,11 @@ func (srv *Server) handleSimpleQuery(ctx context.Context, reader *buffer.Reader,
 		for _, q := range qArr {
 			rdr, err := srv.SQLBackend.HandleSimpleQuery(ctx, q)
 			if err != nil {
-				return ErrorCode(writer, err)
+				return ErrorCode(cn, err)
 			}
 			dw := &dataWriter{
 				ctx:    ctx,
-				client: writer,
+				client: cn,
 			}
 			var headersWritten bool
 			for {
@@ -189,7 +189,7 @@ func (srv *Server) handleSimpleQuery(ctx context.Context, reader *buffer.Reader,
 						dw.Complete("OK")
 						return nil
 					}
-					return ErrorCode(writer, err)
+					return ErrorCode(cn, err)
 				}
 				if !headersWritten {
 					headersWritten = true
@@ -202,11 +202,11 @@ func (srv *Server) handleSimpleQuery(ctx context.Context, reader *buffer.Reader,
 
 	err = srv.SimpleQuery(ctx, query, &dataWriter{
 		ctx:    ctx,
-		client: writer,
+		client: cn,
 	})
 
 	if err != nil {
-		return ErrorCode(writer, err)
+		return ErrorCode(cn, err)
 	}
 
 	return nil

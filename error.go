@@ -26,7 +26,7 @@ const (
 
 // ErrorCode writes a error message as response to a command with the given severity and error message
 // https://www.postgresql.org/docs/current/static/protocol-error-fields.html
-func ErrorCode(writer *buffer.Writer, err error) error {
+func ErrorCode(writer buffer.Writer, err error) error {
 	desc := psqlerr.Flatten(err)
 
 	writer.Start(types.ServerErrorResponse)
