@@ -142,7 +142,7 @@ func (srv *Server) handleCommand(ctx context.Context, conn SQLConnection, t type
 }
 
 func (srv *Server) handleSimpleQuery(ctx context.Context, cn SQLConnection) error {
-	if srv.SimpleQuery == nil && srv.SQLBackend == nil {
+	if srv.SimpleQuery == nil && srv.SQLBackendFactory == nil {
 		return ErrorCode(cn, NewErrUnimplementedMessageType(types.ClientSimpleQuery))
 	}
 
@@ -153,14 +153,13 @@ func (srv *Server) handleSimpleQuery(ctx context.Context, cn SQLConnection) erro
 
 	srv.logger.Debug("incoming query", zap.String("query", query))
 
-	if srv.SQLBackend != nil {
-
-		qArr, err := srv.SQLBackend.SplitCompoundQuery(query)
+	if cn.HasSQLBackend() {
+		qArr, err := cn.SplitCompoundQuery(query)
 		if err != nil {
 			return err
 		}
 		for _, q := range qArr {
-			rdr, err := srv.SQLBackend.HandleSimpleQuery(ctx, q)
+			rdr, err := cn.HandleSimpleQuery(ctx, q)
 			if err != nil {
 				return ErrorCode(cn, err)
 			}

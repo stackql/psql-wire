@@ -21,9 +21,9 @@ func SimpleQuery(fn SimpleQueryFn) OptionFn {
 
 // SQLBackend sets the SQL Backend object to
 // handle queries inside the given server instance.
-func SQLBackend(sb sqlbackend.ISQLBackend) OptionFn {
+func SQLBackendFactory(sb sqlbackend.SQLBackendFactory) OptionFn {
 	return func(srv *Server) {
-		srv.SQLBackend = sb
+		srv.SQLBackendFactory = sb
 	}
 }
 

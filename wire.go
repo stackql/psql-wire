@@ -43,19 +43,27 @@ func NewServer(options ...OptionFn) (*Server, error) {
 
 // Server contains options for listening to an address.
 type Server struct {
-	wg              sync.WaitGroup
-	logger          *logrus.Logger
-	Auth            AuthStrategy
-	BufferedMsgSize int
-	Parameters      Parameters
-	Certificates    []tls.Certificate
-	ClientCAs       *x509.CertPool
-	ClientAuth      tls.ClientAuthType
-	SimpleQuery     SimpleQueryFn
-	SQLBackend      sqlbackend.ISQLBackend
-	CloseConn       CloseFn
-	TerminateConn   CloseFn
-	closer          chan struct{}
+	wg                sync.WaitGroup
+	logger            *logrus.Logger
+	Auth              AuthStrategy
+	BufferedMsgSize   int
+	Parameters        Parameters
+	Certificates      []tls.Certificate
+	ClientCAs         *x509.CertPool
+	ClientAuth        tls.ClientAuthType
+	SimpleQuery       SimpleQueryFn
+	SQLBackendFactory sqlbackend.SQLBackendFactory
+	CloseConn         CloseFn
+	TerminateConn     CloseFn
+	closer            chan struct{}
+}
+
+func (srv *Server) CreateSQLBackend() (sqlbackend.ISQLBackend, bool) {
+	if srv.SQLBackendFactory == nil {
+		return nil, false
+	}
+
+	return srv.SQLBackendFactory.NewSQLBackend(), true
 }
 
 // ListenAndServe opens a new Postgres server on the preconfigured address and
@@ -145,12 +153,18 @@ func (srv *Server) serve(ctx context.Context, conn net.Conn) error {
 		return err
 	}
 
+	sqlBackend, ok := srv.CreateSQLBackend()
+
+	if !ok {
+		srv.logger.Debugf("no sql backend found, using default backend\n")
+	}
+
 	cn := NewSQLConnection(
 		0,
 		conn,
 		reader,
 		writer,
-		srv.SQLBackend,
+		sqlBackend,
 	)
 
 	// this should be a function of connection, not server

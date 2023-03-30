@@ -1,12 +1,14 @@
 package wire
 
 import (
+	"context"
 	"net"
 	"time"
 
 	"github.com/stackql/psql-wire/internal/buffer"
 	"github.com/stackql/psql-wire/internal/types"
 	"github.com/stackql/psql-wire/pkg/sqlbackend"
+	"github.com/stackql/psql-wire/pkg/sqldata"
 )
 
 var (
@@ -18,6 +20,9 @@ type SQLConnection interface {
 	buffer.Reader
 	buffer.Writer
 	ID() uint64
+	HandleSimpleQuery(context.Context, string) (sqldata.ISQLResultStream, error)
+	SplitCompoundQuery(string) ([]string, error)
+	HasSQLBackend() bool
 }
 
 type simpleSqlConnection struct {
@@ -42,6 +47,18 @@ func NewSQLConnection(
 		writer:     writer,
 		sqlBackend: sqlBackend,
 	}
+}
+
+func (c *simpleSqlConnection) HasSQLBackend() bool {
+	return c.sqlBackend != nil
+}
+
+func (c *simpleSqlConnection) HandleSimpleQuery(ctx context.Context, query string) (sqldata.ISQLResultStream, error) {
+	return c.sqlBackend.HandleSimpleQuery(ctx, query)
+}
+
+func (c *simpleSqlConnection) SplitCompoundQuery(query string) ([]string, error) {
+	return c.sqlBackend.SplitCompoundQuery(query)
 }
 
 func (c *simpleSqlConnection) ResetReader(size int) {

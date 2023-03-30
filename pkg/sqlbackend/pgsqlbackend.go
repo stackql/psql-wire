@@ -8,10 +8,13 @@ import (
 
 type QueryCallback func(context.Context, string) (sqldata.ISQLResultStream, error)
 
+type SQLBackendFactory interface {
+	NewSQLBackend() ISQLBackend
+}
+
 type ISQLBackend interface {
 	HandleSimpleQuery(context.Context, string) (sqldata.ISQLResultStream, error)
 	SplitCompoundQuery(string) ([]string, error)
-	CloneSQLBackend() ISQLBackend
 }
 
 type SimpleSQLBackend struct {
@@ -51,5 +54,19 @@ func (sb *SimpleSQLBackend) SplitCompoundQuery(s string) ([]string, error) {
 func NewSimpleSQLBackend(simpleCallback QueryCallback) ISQLBackend {
 	return &SimpleSQLBackend{
 		simpleCallback: simpleCallback,
+	}
+}
+
+type simpleSQLBackendFactory struct {
+	sqlBackend ISQLBackend
+}
+
+func (sbf *simpleSQLBackendFactory) NewSQLBackend() ISQLBackend {
+	return sbf.sqlBackend
+}
+
+func NewSimpleSQLBackendFactory(simpleCallback QueryCallback) SQLBackendFactory {
+	return &simpleSQLBackendFactory{
+		sqlBackend: NewSimpleSQLBackend(simpleCallback),
 	}
 }
