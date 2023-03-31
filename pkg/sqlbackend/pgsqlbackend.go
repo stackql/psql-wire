@@ -9,7 +9,7 @@ import (
 type QueryCallback func(context.Context, string) (sqldata.ISQLResultStream, error)
 
 type SQLBackendFactory interface {
-	NewSQLBackend() ISQLBackend
+	NewSQLBackend() (ISQLBackend, error)
 }
 
 type ISQLBackend interface {
@@ -61,8 +61,8 @@ type simpleSQLBackendFactory struct {
 	sqlBackend ISQLBackend
 }
 
-func (sbf *simpleSQLBackendFactory) NewSQLBackend() ISQLBackend {
-	return sbf.sqlBackend
+func (sbf *simpleSQLBackendFactory) NewSQLBackend() (ISQLBackend, error) {
+	return sbf.sqlBackend, nil
 }
 
 func NewSimpleSQLBackendFactory(simpleCallback QueryCallback) SQLBackendFactory {

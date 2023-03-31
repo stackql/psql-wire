@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"fmt"
 	"net"
 	"sync"
 
@@ -58,12 +59,12 @@ type Server struct {
 	closer            chan struct{}
 }
 
-func (srv *Server) CreateSQLBackend() (sqlbackend.ISQLBackend, bool) {
+func (srv *Server) CreateSQLBackend() (sqlbackend.ISQLBackend, error) {
 	if srv.SQLBackendFactory == nil {
-		return nil, false
+		return nil, fmt.Errorf("no sql backend factory provided")
 	}
 
-	return srv.SQLBackendFactory.NewSQLBackend(), true
+	return srv.SQLBackendFactory.NewSQLBackend()
 }
 
 // ListenAndServe opens a new Postgres server on the preconfigured address and
@@ -153,9 +154,9 @@ func (srv *Server) serve(ctx context.Context, conn net.Conn) error {
 		return err
 	}
 
-	sqlBackend, ok := srv.CreateSQLBackend()
+	sqlBackend, err := srv.CreateSQLBackend()
 
-	if !ok {
+	if err != nil {
 		srv.logger.Debugf("no sql backend found, using default backend\n")
 	}
 
