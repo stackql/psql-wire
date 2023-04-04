@@ -163,9 +163,10 @@ func TestReadUntypedMsgParameters(t *testing.T) {
 }
 
 func TestGetStringNulTerminatorNotfound(t *testing.T) {
-	reader := &Reader{
-		Msg: []byte("John Doe"),
-	}
+	reader := CreateTestReader(
+		[]byte("John Doe"),
+		nil,
+	)
 
 	_, err := reader.GetString()
 	if !errors.Is(err, ErrMissingNulTerminator) {
@@ -175,10 +176,10 @@ func TestGetStringNulTerminatorNotfound(t *testing.T) {
 
 func TestGetInsufficientData(t *testing.T) {
 	buffer := bytes.NewBuffer([]byte{})
-	reader := &Reader{
-		Msg:    []byte{},
-		Buffer: bufio.NewReader(buffer),
-	}
+	reader := CreateTestReader(
+		[]byte{},
+		bufio.NewReader(buffer),
+	)
 
 	t.Run("typed header msg", func(t *testing.T) {
 		_, _, err := reader.ReadTypedMsg()
@@ -242,34 +243,36 @@ func TestMsgReset(t *testing.T) {
 	expected := 4096
 
 	t.Run("undefined", func(t *testing.T) {
-		reader := &Reader{}
-		reader.reset(expected)
+		reader := CreateTestReader(nil, nil)
+		reader.ResetReader(expected)
 
-		if len(reader.Msg) != expected {
-			t.Errorf("unexpected reader message size %d, expected %d", len(reader.Msg), expected)
+		if len(reader.PeekMsg()) != expected {
+			t.Errorf("unexpected reader message size %d, expected %d", len(reader.PeekMsg()), expected)
 		}
 	})
 
 	t.Run("greater", func(t *testing.T) {
-		reader := &Reader{
-			Msg: make([]byte, 0, expected*2),
-		}
+		reader := CreateTestReader(
+			make([]byte, 0, expected*2),
+			nil,
+		)
 
-		reader.reset(expected)
+		reader.ResetReader(expected)
 
-		if len(reader.Msg) != expected {
-			t.Errorf("unexpected reader message size %d, expected %d", len(reader.Msg), expected)
+		if len(reader.PeekMsg()) != expected {
+			t.Errorf("unexpected reader message size %d, expected %d", len(reader.PeekMsg()), expected)
 		}
 	})
 
 	t.Run("smaller", func(t *testing.T) {
-		reader := &Reader{
-			Msg: make([]byte, 0, expected/2),
-		}
-		reader.reset(expected)
+		reader := CreateTestReader(
+			make([]byte, 0, expected/2),
+			nil,
+		)
+		reader.ResetReader(expected)
 
-		if len(reader.Msg) != expected {
-			t.Errorf("unexpected reader message size %d, expected %d", len(reader.Msg), expected)
+		if len(reader.PeekMsg()) != expected {
+			t.Errorf("unexpected reader message size %d, expected %d", len(reader.PeekMsg()), expected)
 		}
 	})
 }

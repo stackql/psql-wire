@@ -261,9 +261,9 @@ func TestSQLBackendServerWritingResult(t *testing.T) {
 		return sb, nil
 	}
 
-	sqlBackend := sqlbackend.NewSimpleSQLBackend(qcb)
+	sqlBackendFactory := sqlbackend.NewSimpleSQLBackendFactory(qcb)
 
-	server, err := NewServer(SQLBackend(sqlBackend))
+	server, err := NewServer(SQLBackendFactory(sqlBackendFactory))
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -51,7 +51,7 @@ var ErrClosedWriter = errors.New("closed writer")
 type dataWriter struct {
 	columns Columns
 	ctx     context.Context
-	client  *buffer.Writer
+	client  buffer.Writer
 	closed  bool
 	written uint64
 }
@@ -123,7 +123,7 @@ func (writer *dataWriter) close() {
 // commandComplete announces that the requested command has successfully been executed.
 // The given description is written back to the client and could be used to send
 // additional meta data to the user.
-func commandComplete(writer *buffer.Writer, description string) error {
+func commandComplete(writer buffer.Writer, description string) error {
 	writer.Start(types.ServerCommandComplete)
 	writer.AddString(description)
 	writer.AddNullTerminate()
@@ -131,7 +131,7 @@ func commandComplete(writer *buffer.Writer, description string) error {
 }
 
 // emptyQuery indicates a empty query response by sending a emptyQuery message.
-func emptyQuery(writer *buffer.Writer) error {
+func emptyQuery(writer buffer.Writer) error {
 	writer.Start(types.ServerEmptyQuery)
 	return writer.End()
 }
