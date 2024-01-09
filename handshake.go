@@ -123,11 +123,20 @@ func (srv *Server) writeParameters(ctx context.Context, writer buffer.Writer, pa
 	return setServerParameters(ctx, params), nil
 }
 
+func (srv *Server) isMandatoryTLS(clientAuth tls.ClientAuthType) bool {
+	if clientAuth == tls.RequireAndVerifyClientCert {
+		return true
+	}
+	return false
+}
+
 // potentialConnUpgrade potentially upgrades the given connection using TLS
-// if the client requests for it. The connection upgrade is ignored if the
+// if the client requests for it, or the server mandates it. The connection upgrade is ignored if the
 // server does not support a secure connection.
 func (srv *Server) potentialConnUpgrade(conn net.Conn, reader buffer.Reader, version types.Version) (_ net.Conn, _ buffer.Reader, _ types.Version, err error) {
-	if version != types.VersionSSLRequest {
+	// server to enforce secure connections as appropriate
+	isMandatoryTLS := srv.isMandatoryTLS(srv.ClientAuth)
+	if version != types.VersionSSLRequest && !isMandatoryTLS {
 		return conn, reader, version, nil
 	}
 
