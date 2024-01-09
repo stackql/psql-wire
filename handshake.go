@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 	"errors"
+	"fmt"
 	"net"
 
 	"github.com/stackql/psql-wire/internal/buffer"
@@ -123,17 +124,34 @@ func (srv *Server) writeParameters(ctx context.Context, writer buffer.Writer, pa
 	return setServerParameters(ctx, params), nil
 }
 
+func (srv *Server) isMandatoryTLS(clientAuth tls.ClientAuthType) bool {
+	if clientAuth == tls.RequireAndVerifyClientCert {
+		return true
+	}
+	return false
+}
+
 // potentialConnUpgrade potentially upgrades the given connection using TLS
-// if the client requests for it. The connection upgrade is ignored if the
+// if the client requests for it, or the server mandates it. The connection upgrade is ignored if the
 // server does not support a secure connection.
 func (srv *Server) potentialConnUpgrade(conn net.Conn, reader buffer.Reader, version types.Version) (_ net.Conn, _ buffer.Reader, _ types.Version, err error) {
+	// server to enforce secure connections as appropriate
+	isMandatoryTLS := srv.isMandatoryTLS(srv.ClientAuth)
 	if version != types.VersionSSLRequest {
+		if isMandatoryTLS {
+			srv.logger.Warn("client is requesting nil TLS, but the server mandates TLS")
+			return conn, reader, version, fmt.Errorf("client is requesting nil TLS, but the server mandates TLS")
+		}
 		return conn, reader, version, nil
 	}
 
 	srv.logger.Debug("attempting to upgrade the client to a TLS connection")
 
 	if len(srv.Certificates) == 0 {
+		if isMandatoryTLS {
+			srv.logger.Warn("server mandates TLS, but does not possess the requisite certificates")
+			return conn, reader, version, fmt.Errorf("server mandates TLS, but does not possess the requisite certificates")
+		}
 		srv.logger.Debug("no TLS certificates available continuing with a insecure connection")
 		return srv.sslUnsupported(conn, reader, version)
 	}
