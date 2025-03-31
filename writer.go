@@ -135,7 +135,7 @@ func commandComplete(writer buffer.Writer, description string) error {
 
 func noticesComplete(writer buffer.Writer, notices string) error {
 	writer.Start(types.ServerNoticeResponse)
-	writer.AddInt32(int32(len(notices) + 3)) // length
+	writer.AddInt32(int32(len(notices) + 7)) // length
 	writer.AddByte('D')                      // code
 	writer.AddString(notices)
 	writer.AddNullTerminate()
