@@ -136,13 +136,18 @@ func commandComplete(writer buffer.Writer, description string) error {
 func noticesComplete(writer buffer.Writer, notices string) error {
 	writer.Start(types.ServerNoticeResponse)
 	// writer.AddInt32(int32(len(notices) + 7)) // length
+	writer.AddByte('S') // code
+	writer.AddString("NOTICE")
+	writer.AddNullTerminate()
+	writer.AddByte('V') // code
+	writer.AddString("NOTICE")
 	writer.AddByte('M')
 	writer.AddString("a notice level event has occurred")
 	writer.AddNullTerminate()
 	// writer.AddByte('D') // code
 	// writer.AddString(notices)
 	// writer.AddNullTerminate()
-	return writer.EndVariable(0)
+	return writer.EndVariable(1)
 }
 
 // emptyQuery indicates a empty query response by sending a emptyQuery message.
