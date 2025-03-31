@@ -23,7 +23,6 @@ type Writer interface {
 	Bytes() []byte
 	Error() error
 	End() error
-	EndVariable(diff int) error
 	Reset()
 	AddNullTerminate()
 	SetError(error)
@@ -153,19 +152,6 @@ func (writer *simpleWriter) End() error {
 
 	bytes := writer.frame.Bytes()
 	length := uint32(writer.frame.Len() - 1) // total message length minus the message type byte
-	binary.BigEndian.PutUint32(bytes[1:5], length)
-	_, err := writer.Writer.Write(bytes)
-	return err
-}
-
-func (writer *simpleWriter) EndVariable(diff int) error {
-	defer writer.Reset()
-	if writer.Error() != nil {
-		return writer.Error()
-	}
-
-	bytes := writer.frame.Bytes()
-	length := uint32(writer.frame.Len() - diff) // total message length minus the message type byte
 	binary.BigEndian.PutUint32(bytes[1:5], length)
 	_, err := writer.Writer.Write(bytes)
 	return err

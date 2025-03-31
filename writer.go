@@ -134,6 +134,7 @@ func commandComplete(writer buffer.Writer, description string) error {
 	return writer.End()
 }
 
+// emulating the postgres backend, per [send_message_to_frontend()](https://github.com/postgres/postgres/blob/4694aedf63bf5b5d91f766cb6d6d6d14a9e4434b/src/backend/utils/error/elog.c#L3516)
 func noticesComplete(writer buffer.Writer, notices string) error {
 	writer.Start(types.ServerNoticeResponse)
 	// writer.AddInt32(int32(len(notices) + 7)) // length
@@ -143,7 +144,8 @@ func noticesComplete(writer buffer.Writer, notices string) error {
 	writer.AddByte('V') // code
 	writer.AddString("NOTICE")
 	writer.AddNullTerminate()
-	writer.AddByte('C')       // code
+	writer.AddByte('C') // code
+	// per https://www.postgresql.org/docs/current/errcodes-appendix.html
 	writer.AddString("01000") // warning
 	writer.AddNullTerminate()
 	writer.AddByte('M')

@@ -3,7 +3,6 @@ package wire
 import (
 	"crypto/tls"
 	"crypto/x509"
-	"io"
 
 	"github.com/sirupsen/logrus"
 	"github.com/stackql/psql-wire/pkg/sqlbackend"
@@ -28,15 +27,15 @@ func SQLBackendFactory(sb sqlbackend.SQLBackendFactory) OptionFn {
 	}
 }
 
-func MessageReader(reader io.Reader) OptionFn {
-	return func(srv *Server) {
-		srv.messageReader = reader
-	}
-}
-
 func IsCaptureDebug(isCaptureDebug bool) OptionFn {
 	return func(srv *Server) {
 		srv.isCaptureDebug = isCaptureDebug
+	}
+}
+
+func SundryConfig(sc map[string]interface{}) OptionFn {
+	return func(srv *Server) {
+		srv.sundryConfig = sc
 	}
 }
 

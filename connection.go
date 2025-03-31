@@ -192,7 +192,3 @@ func (c *simpleSqlConnection) AddNullTerminate() {
 func (c *simpleSqlConnection) End() error {
 	return c.writer.End()
 }
-
-func (c *simpleSqlConnection) EndVariable(diff int) error {
-	return c.writer.EndVariable(diff)
-}
