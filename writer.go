@@ -142,7 +142,7 @@ func noticesComplete(writer buffer.Writer, notices string) error {
 	// writer.AddByte('D') // code
 	// writer.AddString(notices)
 	// writer.AddNullTerminate()
-	return writer.End()
+	return writer.EndVariable(2)
 }
 
 // emptyQuery indicates a empty query response by sending a emptyQuery message.
