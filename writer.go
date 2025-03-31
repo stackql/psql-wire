@@ -138,6 +138,7 @@ func noticesComplete(writer buffer.Writer, notices string) error {
 	// writer.AddInt32(int32(len(notices) + 7)) // length
 	writer.AddByte('M')
 	writer.AddString("a notice level event has occurred")
+	writer.AddNullTerminate()
 	writer.AddByte('D') // code
 	writer.AddString(notices)
 	writer.AddNullTerminate()
