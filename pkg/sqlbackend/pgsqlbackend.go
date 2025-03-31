@@ -15,17 +15,22 @@ type SQLBackendFactory interface {
 type ISQLBackend interface {
 	HandleSimpleQuery(context.Context, string) (sqldata.ISQLResultStream, error)
 	SplitCompoundQuery(string) ([]string, error)
+	GetDebugStr() string
 }
 
 type SimpleSQLBackend struct {
 	simpleCallback QueryCallback
 }
 
-func (sb *SimpleSQLBackend) CloneSQLBackend() ISQLBackend {
-	return &SimpleSQLBackend{
-		simpleCallback: sb.simpleCallback,
-	}
+func (sb *SimpleSQLBackend) GetDebugStr() string {
+	return ""
 }
+
+// func (sb *SimpleSQLBackend) CloneSQLBackend() ISQLBackend {
+// 	return &SimpleSQLBackend{
+// 		simpleCallback: sb.simpleCallback,
+// 	}
+// }
 
 func (sb *SimpleSQLBackend) HandleSimpleQuery(ctx context.Context, query string) (sqldata.ISQLResultStream, error) {
 	return sb.simpleCallback(ctx, query)
@@ -51,6 +56,7 @@ func (sb *SimpleSQLBackend) SplitCompoundQuery(s string) ([]string, error) {
 	return append(res, s[beg:]), nil
 }
 
+// TODO: debug message handling
 func NewSimpleSQLBackend(simpleCallback QueryCallback) ISQLBackend {
 	return &SimpleSQLBackend{
 		simpleCallback: simpleCallback,

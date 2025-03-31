@@ -40,7 +40,7 @@ func TestClientConnect(t *testing.T) {
 	t.Parallel()
 
 	pong := func(ctx context.Context, query string, writer DataWriter) error {
-		return writer.Complete("OK")
+		return writer.Complete("", "OK")
 	}
 
 	server, err := NewServer(SimpleQuery(pong))
@@ -133,7 +133,7 @@ func TestServerWritingResult(t *testing.T) {
 
 		writer.Row([]interface{}{"John", true, 28})   //nolint:errcheck
 		writer.Row([]interface{}{"Marry", false, 21}) //nolint:errcheck
-		return writer.Complete("OK")
+		return writer.Complete("", "OK")
 	}
 
 	server, err := NewServer(SimpleQuery(handler))

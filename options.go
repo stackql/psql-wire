@@ -27,6 +27,18 @@ func SQLBackendFactory(sb sqlbackend.SQLBackendFactory) OptionFn {
 	}
 }
 
+func IsCaptureDebug(isCaptureDebug bool) OptionFn {
+	return func(srv *Server) {
+		srv.isCaptureDebug = isCaptureDebug
+	}
+}
+
+func SundryConfig(sc map[string]interface{}) OptionFn {
+	return func(srv *Server) {
+		srv.sundryConfig = sc
+	}
+}
+
 // CloseConn sets the close connection handle inside the given server instance.
 func CloseConn(fn CloseFn) OptionFn {
 	return func(srv *Server) {

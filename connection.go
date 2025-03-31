@@ -22,6 +22,7 @@ type SQLConnection interface {
 	ID() uint64
 	HandleSimpleQuery(context.Context, string) (sqldata.ISQLResultStream, error)
 	SplitCompoundQuery(string) ([]string, error)
+	GetDebugStr() string
 	HasSQLBackend() bool
 }
 
@@ -51,6 +52,13 @@ func NewSQLConnection(
 
 func (c *simpleSqlConnection) HasSQLBackend() bool {
 	return c.sqlBackend != nil
+}
+
+func (c *simpleSqlConnection) GetDebugStr() string {
+	if c.sqlBackend != nil {
+		return c.sqlBackend.GetDebugStr()
+	}
+	return ""
 }
 
 func (c *simpleSqlConnection) HandleSimpleQuery(ctx context.Context, query string) (sqldata.ISQLResultStream, error) {
