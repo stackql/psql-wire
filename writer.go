@@ -29,7 +29,7 @@ type DataWriter interface {
 
 	// Complete announces to the client that the command has been completed and
 	// no further data should be expected.
-	Complete(description string) error
+	Complete(notices string, description string) error
 }
 
 // ErrColumnsDefined is thrown when columns already have been defined inside the
@@ -100,7 +100,7 @@ func (writer *dataWriter) Empty() error {
 	return emptyQuery(writer.client)
 }
 
-func (writer *dataWriter) Complete(description string) error {
+func (writer *dataWriter) Complete(notices, description string) error {
 	if writer.closed {
 		return ErrClosedWriter
 	}
@@ -113,6 +113,9 @@ func (writer *dataWriter) Complete(description string) error {
 	}
 
 	defer writer.close()
+	if notices != "" {
+		noticesComplete(writer.client, notices)
+	}
 	return commandComplete(writer.client, description)
 }
 
@@ -126,6 +129,13 @@ func (writer *dataWriter) close() {
 func commandComplete(writer buffer.Writer, description string) error {
 	writer.Start(types.ServerCommandComplete)
 	writer.AddString(description)
+	writer.AddNullTerminate()
+	return writer.End()
+}
+
+func noticesComplete(writer buffer.Writer, notices string) error {
+	writer.Start(types.ServerNoticeResponse)
+	writer.AddString(notices)
 	writer.AddNullTerminate()
 	return writer.End()
 }

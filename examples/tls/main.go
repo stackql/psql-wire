@@ -34,5 +34,5 @@ func run() error {
 }
 
 func handle(ctx context.Context, query string, writer wire.DataWriter) error {
-	return writer.Complete("OK")
+	return writer.Complete("", "OK")
 }

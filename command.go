@@ -177,16 +177,15 @@ func (srv *Server) handleSimpleQuery(ctx context.Context, cn SQLConnection) erro
 			var headersWritten bool
 			for {
 				if rdr == nil {
-					dw.Complete("OK")
+					dw.Complete("", "OK")
 					return nil
 				}
 				res, err := rdr.Read()
 				if err != nil {
 					if errors.Is(err, io.EOF) {
-						messages := cn.GetDebugStr()
-						messages = strings.Join([]string{messages, "OK"}, "\n")
+						notices := cn.GetDebugStr()
 						if res == nil {
-							dw.Complete(messages)
+							dw.Complete(notices, "OK")
 							return nil
 						}
 						if !headersWritten {
@@ -195,7 +194,7 @@ func (srv *Server) handleSimpleQuery(ctx context.Context, cn SQLConnection) erro
 						}
 						srv.writeSQLResultRows(ctx, res, dw)
 						// TODO: add debug messages, configurably
-						dw.Complete(messages)
+						dw.Complete(notices, "OK")
 						return nil
 					}
 					return ErrorCode(cn, err)

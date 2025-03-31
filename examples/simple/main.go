@@ -43,5 +43,5 @@ func handle(ctx context.Context, query string, writer wire.DataWriter) error {
 	writer.Define(table)
 	writer.Row([]interface{}{"John", true, 29})
 	writer.Row([]interface{}{"Marry", false, 21})
-	return writer.Complete("OK")
+	return writer.Complete("", "OK")
 }
