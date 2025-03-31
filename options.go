@@ -34,6 +34,12 @@ func MessageReader(reader io.Reader) OptionFn {
 	}
 }
 
+func IsCaptureDebug(isCaptureDebug bool) OptionFn {
+	return func(srv *Server) {
+		srv.isCaptureDebug = isCaptureDebug
+	}
+}
+
 // CloseConn sets the close connection handle inside the given server instance.
 func CloseConn(fn CloseFn) OptionFn {
 	return func(srv *Server) {

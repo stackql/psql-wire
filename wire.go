@@ -62,6 +62,7 @@ type Server struct {
 	CloseConn         CloseFn
 	TerminateConn     CloseFn
 	messageReader     io.Reader
+	isCaptureDebug    bool
 	closer            chan struct{}
 }
 
