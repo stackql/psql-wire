@@ -183,10 +183,7 @@ func (srv *Server) handleSimpleQuery(ctx context.Context, cn SQLConnection) erro
 				res, err := rdr.Read()
 				if err != nil {
 					if errors.Is(err, io.EOF) {
-						messages, messageErr := srv.stringifyMessages()
-						if messageErr != nil {
-							strings.Join([]string{messages, messageErr.Error()}, "\n")
-						}
+						messages := cn.GetDebugStr()
 						messages = strings.Join([]string{messages, "OK"}, "\n")
 						if res == nil {
 							dw.Complete(messages)
