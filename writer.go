@@ -29,7 +29,7 @@ type DataWriter interface {
 
 	// Complete announces to the client that the command has been completed and
 	// no further data should be expected.
-	Complete(description string) error
+	Complete(notices string, description string) error
 }
 
 // ErrColumnsDefined is thrown when columns already have been defined inside the
@@ -100,7 +100,7 @@ func (writer *dataWriter) Empty() error {
 	return emptyQuery(writer.client)
 }
 
-func (writer *dataWriter) Complete(description string) error {
+func (writer *dataWriter) Complete(notices, description string) error {
 	if writer.closed {
 		return ErrClosedWriter
 	}
@@ -113,6 +113,10 @@ func (writer *dataWriter) Complete(description string) error {
 	}
 
 	defer writer.close()
+	if notices != "" {
+		noticesComplete(writer.client, notices)
+		return commandComplete(writer.client, "")
+	}
 	return commandComplete(writer.client, description)
 }
 
@@ -126,6 +130,30 @@ func (writer *dataWriter) close() {
 func commandComplete(writer buffer.Writer, description string) error {
 	writer.Start(types.ServerCommandComplete)
 	writer.AddString(description)
+	writer.AddNullTerminate()
+	return writer.End()
+}
+
+// emulating the postgres backend, per [send_message_to_frontend()](https://github.com/postgres/postgres/blob/4694aedf63bf5b5d91f766cb6d6d6d14a9e4434b/src/backend/utils/error/elog.c#L3516)
+func noticesComplete(writer buffer.Writer, notices string) error {
+	writer.Start(types.ServerNoticeResponse)
+	// writer.AddInt32(int32(len(notices) + 7)) // length
+	writer.AddByte('S') // code
+	writer.AddString("NOTICE")
+	writer.AddNullTerminate()
+	writer.AddByte('V') // code
+	writer.AddString("NOTICE")
+	writer.AddNullTerminate()
+	writer.AddByte('C') // code
+	// per https://www.postgresql.org/docs/current/errcodes-appendix.html
+	writer.AddString("01000") // warning
+	writer.AddNullTerminate()
+	writer.AddByte('M')
+	writer.AddString("a notice level event has occurred")
+	writer.AddNullTerminate()
+	writer.AddByte('D') // code
+	writer.AddString(notices)
+	writer.AddNullTerminate()
 	writer.AddNullTerminate()
 	return writer.End()
 }

@@ -31,8 +31,9 @@ func ListenAndServe(address string, handler SimpleQueryFn) error {
 // NewServer constructs a new Postgres server using the given address and server options.
 func NewServer(options ...OptionFn) (*Server, error) {
 	srv := &Server{
-		logger: logrus.StandardLogger(),
-		closer: make(chan struct{}),
+		logger:       logrus.StandardLogger(),
+		closer:       make(chan struct{}),
+		sundryConfig: make(map[string]interface{}),
 	}
 
 	for _, option := range options {
@@ -56,7 +57,9 @@ type Server struct {
 	SQLBackendFactory sqlbackend.SQLBackendFactory
 	CloseConn         CloseFn
 	TerminateConn     CloseFn
+	isCaptureDebug    bool
 	closer            chan struct{}
+	sundryConfig      map[string]interface{}
 }
 
 func (srv *Server) CreateSQLBackend() (sqlbackend.ISQLBackend, error) {
