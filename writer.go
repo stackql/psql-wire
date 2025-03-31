@@ -136,6 +136,8 @@ func commandComplete(writer buffer.Writer, description string) error {
 func noticesComplete(writer buffer.Writer, notices string) error {
 	writer.Start(types.ServerNoticeResponse)
 	// writer.AddInt32(int32(len(notices) + 7)) // length
+	writer.AddByte('M')
+	writer.AddString("a notice level event has occurred")
 	writer.AddByte('D') // code
 	writer.AddString(notices)
 	writer.AddNullTerminate()
