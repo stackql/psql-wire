@@ -1,10 +1,12 @@
 package wire
 
 import (
+	"bytes"
 	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
+	"io"
 	"net"
 	"sync"
 
@@ -38,6 +40,9 @@ func NewServer(options ...OptionFn) (*Server, error) {
 	for _, option := range options {
 		option(srv)
 	}
+	if srv.messageReader == nil {
+		srv.messageReader = bytes.NewBuffer([]byte{})
+	}
 
 	return srv, nil
 }
@@ -56,6 +61,7 @@ type Server struct {
 	SQLBackendFactory sqlbackend.SQLBackendFactory
 	CloseConn         CloseFn
 	TerminateConn     CloseFn
+	messageReader     io.Reader
 	closer            chan struct{}
 }
 

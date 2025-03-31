@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/lib/pq/oid"
 	"github.com/stackql/psql-wire/codes"
@@ -141,6 +142,12 @@ func (srv *Server) handleCommand(ctx context.Context, conn SQLConnection, t type
 	return nil
 }
 
+func (srv *Server) stringifyMessages() (string, error) {
+	buf := new(strings.Builder)
+	_, err := io.Copy(buf, srv.messageReader)
+	return buf.String(), err
+}
+
 func (srv *Server) handleSimpleQuery(ctx context.Context, cn SQLConnection) error {
 	if srv.SimpleQuery == nil && srv.SQLBackendFactory == nil {
 		return ErrorCode(cn, NewErrUnimplementedMessageType(types.ClientSimpleQuery))
@@ -176,8 +183,13 @@ func (srv *Server) handleSimpleQuery(ctx context.Context, cn SQLConnection) erro
 				res, err := rdr.Read()
 				if err != nil {
 					if errors.Is(err, io.EOF) {
+						messages, messageErr := srv.stringifyMessages()
+						if messageErr != nil {
+							strings.Join([]string{messages, messageErr.Error()}, "\n")
+						}
+						messages = strings.Join([]string{messages, "OK"}, "\n")
 						if res == nil {
-							dw.Complete("OK")
+							dw.Complete(messages)
 							return nil
 						}
 						if !headersWritten {
@@ -185,7 +197,8 @@ func (srv *Server) handleSimpleQuery(ctx context.Context, cn SQLConnection) erro
 							srv.writeSQLResultHeader(ctx, res, dw)
 						}
 						srv.writeSQLResultRows(ctx, res, dw)
-						dw.Complete("OK")
+						// TODO: add debug messages, configurably
+						dw.Complete(messages)
 						return nil
 					}
 					return ErrorCode(cn, err)

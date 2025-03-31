@@ -3,6 +3,7 @@ package wire
 import (
 	"crypto/tls"
 	"crypto/x509"
+	"io"
 
 	"github.com/sirupsen/logrus"
 	"github.com/stackql/psql-wire/pkg/sqlbackend"
@@ -24,6 +25,12 @@ func SimpleQuery(fn SimpleQueryFn) OptionFn {
 func SQLBackendFactory(sb sqlbackend.SQLBackendFactory) OptionFn {
 	return func(srv *Server) {
 		srv.SQLBackendFactory = sb
+	}
+}
+
+func MessageReader(reader io.Reader) OptionFn {
+	return func(srv *Server) {
+		srv.messageReader = reader
 	}
 }
 
