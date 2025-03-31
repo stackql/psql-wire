@@ -115,6 +115,7 @@ func (writer *dataWriter) Complete(notices, description string) error {
 	defer writer.close()
 	if notices != "" {
 		noticesComplete(writer.client, notices)
+		return commandComplete(writer.client, "")
 	}
 	return commandComplete(writer.client, description)
 }
@@ -152,7 +153,7 @@ func noticesComplete(writer buffer.Writer, notices string) error {
 	writer.AddString(notices)
 	writer.AddNullTerminate()
 	writer.AddNullTerminate()
-	return writer.EndVariable(1)
+	return writer.End()
 }
 
 // emptyQuery indicates a empty query response by sending a emptyQuery message.
