@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"strings"
 
 	"github.com/lib/pq/oid"
 	"github.com/stackql/psql-wire/codes"
@@ -140,12 +139,6 @@ func (srv *Server) handleCommand(ctx context.Context, conn SQLConnection, t type
 	}
 
 	return nil
-}
-
-func (srv *Server) stringifyMessages() (string, error) {
-	buf := new(strings.Builder)
-	_, err := io.Copy(buf, srv.messageReader)
-	return buf.String(), err
 }
 
 func (srv *Server) handleSimpleQuery(ctx context.Context, cn SQLConnection) error {
