@@ -100,6 +100,14 @@ func (writer *dataWriter) Empty() error {
 	return emptyQuery(writer.client)
 }
 
+func (writer *dataWriter) ServerReady() error {
+	if writer.closed {
+		return ErrClosedWriter
+	}
+	defer writer.close()
+	return serverReady(writer.client)
+}
+
 func (writer *dataWriter) Complete(notices, description string) error {
 	if writer.closed {
 		return ErrClosedWriter
@@ -130,6 +138,13 @@ func (writer *dataWriter) close() {
 func commandComplete(writer buffer.Writer, description string) error {
 	writer.Start(types.ServerCommandComplete)
 	writer.AddString(description)
+	writer.AddNullTerminate()
+	return writer.End()
+}
+
+func serverReady(writer buffer.Writer) error {
+	writer.Start(types.ServerReady)
+	writer.AddByte('I') // idle
 	writer.AddNullTerminate()
 	return writer.End()
 }

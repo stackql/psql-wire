@@ -104,7 +104,11 @@ func (srv *Server) handleCommand(ctx context.Context, conn SQLConnection, t type
 
 	switch t {
 	case types.ClientSync:
-		// TODO(Jeroen): client sync received
+		// https://www.postgresql.org/docs/current/protocol-message-formats.html#PROTOCOL-MESSAGE-FORMATS-SYNC
+		// Per the protocol spec, the server must respond with a ReadyForQuery
+		// https://www.postgresql.org/docs/current/protocol-flow.html
+		return srv.handleServerReadyForQuery(ctx, conn, types.ServerIdle)
+
 	case types.ClientSimpleQuery:
 		// TODO: make this a function of connection
 		return srv.handleSimpleQuery(ctx, conn)
@@ -139,6 +143,15 @@ func (srv *Server) handleCommand(ctx context.Context, conn SQLConnection, t type
 	}
 
 	return nil
+}
+
+func (srv *Server) handleServerReadyForQuery(ctx context.Context, cn SQLConnection, status types.ServerStatus) error {
+	dw := &dataWriter{
+		ctx:    ctx,
+		client: cn,
+	}
+	err := dw.ServerReady()
+	return err
 }
 
 func (srv *Server) handleSimpleQuery(ctx context.Context, cn SQLConnection) error {
