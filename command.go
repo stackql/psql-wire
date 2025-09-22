@@ -69,6 +69,11 @@ func (srv *Server) consumeCommands(ctx context.Context, conn SQLConnection) (err
 		if err != nil {
 			return err
 		}
+
+		// NOTE(Prasad): If conn is closed after handleCommand return.
+		if t == types.ClientClose || t == types.ClientTerminate {
+			return nil
+		}
 	}
 }
 
