@@ -11,6 +11,7 @@ type ISQLResult interface {
 	GetRowsAffected() uint64
 	GetInsertId() uint64
 	GetRows() []ISQLRow
+	ToArr() []map[string]interface{}
 }
 
 type ISQLResultStream interface {
@@ -81,7 +82,7 @@ func (srs *ChannelSQLResultStream) Write(r ISQLResult) error {
 	return nil
 }
 
-type SQLResult struct {
+type sqlResult struct {
 	columns      []ISQLColumn
 	rowsAffected uint64
 	insertID     uint64
@@ -93,8 +94,8 @@ func NewSQLResult(
 	rowsAffected uint64,
 	insertID uint64,
 	rows []ISQLRow,
-) *SQLResult {
-	return &SQLResult{
+) ISQLResult {
+	return &sqlResult{
 		columns:      columns,
 		rowsAffected: rowsAffected,
 		insertID:     insertID,
@@ -102,20 +103,45 @@ func NewSQLResult(
 	}
 }
 
-func (sr *SQLResult) GetColumns() []ISQLColumn {
+func (sr *sqlResult) GetColumns() []ISQLColumn {
 	return sr.columns
 }
 
-func (sr *SQLResult) GetRowsAffected() uint64 {
+func (sr *sqlResult) GetRowsAffected() uint64 {
 	return sr.rowsAffected
 }
 
-func (sr *SQLResult) GetInsertId() uint64 {
+func (sr *sqlResult) GetInsertId() uint64 {
 	return sr.insertID
 }
 
-func (sr *SQLResult) GetRows() []ISQLRow {
+func (sr *sqlResult) GetRows() []ISQLRow {
 	return sr.rows
+}
+
+func (sr *sqlResult) ToArr() []map[string]interface{} {
+	var keys []string
+	for _, col := range sr.GetColumns() {
+		keys = append(keys, col.GetName())
+	}
+	var retVal []map[string]interface{}
+	for _, r := range sr.GetRows() {
+		rowArr := r.GetRowDataNaive()
+		if len(rowArr) == 0 {
+			continue
+		}
+		rm := make(map[string]interface{})
+		for i, c := range keys {
+			switch tp := rowArr[i].(type) {
+			case []byte:
+				rm[c] = string(tp)
+			default:
+				rm[c] = tp
+			}
+		}
+		retVal = append(retVal, rm)
+	}
+	return retVal
 }
 
 type ISQLTable interface {
