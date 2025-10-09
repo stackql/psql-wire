@@ -158,7 +158,19 @@ func (srv *Server) handleSimpleQuery(ctx context.Context, cn SQLConnection) erro
 		if err != nil {
 			return err
 		}
-		for _, q := range qArr {
+		for i, q := range qArr {
+			if q == "" {
+				if i == len(qArr)-1 {
+					// trailing semicolon, ignore
+					dw := &dataWriter{
+						ctx:    ctx,
+						client: cn,
+					}
+					dw.Complete("", "OK")
+					return nil
+				}
+				continue
+			}
 			rdr, err := cn.HandleSimpleQuery(ctx, q)
 			if err != nil {
 				return ErrorCode(cn, err)
