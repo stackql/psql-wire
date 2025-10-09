@@ -104,6 +104,7 @@ func (srv *Server) writeParameters(ctx context.Context, writer buffer.Writer, pa
 
 	params[ParamServerEncoding] = "UTF8"
 	params[ParamClientEncoding] = "UTF8"
+	params[ParamStandardConformingStrings] = "on"
 	params[ParamIsSuperuser] = buffer.EncodeBoolean(IsSuperUser(ctx))
 	params[ParamSessionAuthorization] = AuthenticatedUsername(ctx)
 	params[ParamServerVersion] = fmt.Sprintf("%d", 15*10000) // 15.1.2 => 15*10000 + 1*100 + 2*1 => 15102
