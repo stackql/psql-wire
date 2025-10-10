@@ -42,14 +42,15 @@ type ParameterStatus string
 // will be generated.
 // https://www.postgresql.org/docs/13/protocol-flow.html#PROTOCOL-ASYNC
 const (
-	ParamServerEncoding       ParameterStatus = "server_encoding"
-	ParamClientEncoding       ParameterStatus = "client_encoding"
-	ParamIsSuperuser          ParameterStatus = "is_superuser"
-	ParamSessionAuthorization ParameterStatus = "session_authorization"
-	ParamApplicationName      ParameterStatus = "application_name"
-	ParamDatabase             ParameterStatus = "database"
-	ParamUsername             ParameterStatus = "user"
-	ParamServerVersion        ParameterStatus = "server_version"
+	ParamServerEncoding            ParameterStatus = "server_encoding"
+	ParamClientEncoding            ParameterStatus = "client_encoding"
+	ParamStandardConformingStrings ParameterStatus = "standard_conforming_strings"
+	ParamIsSuperuser               ParameterStatus = "is_superuser"
+	ParamSessionAuthorization      ParameterStatus = "session_authorization"
+	ParamApplicationName           ParameterStatus = "application_name"
+	ParamDatabase                  ParameterStatus = "database"
+	ParamUsername                  ParameterStatus = "user"
+	ParamServerVersion             ParameterStatus = "server_version"
 )
 
 // setClientParameters constructs a new context containing the given parameters.
