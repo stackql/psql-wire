@@ -105,14 +105,18 @@ func (srv *Server) handleCommand(ctx context.Context, conn SQLConnection, t type
 	switch t {
 	case types.ClientSync:
 		// TODO(Jeroen): client sync received
+		return srv.completeSuccess(ctx, conn)
 	case types.ClientSimpleQuery:
 		// TODO: make this a function of connection
 		return srv.handleSimpleQuery(ctx, conn)
 	case types.ClientExecute:
 		return srv.completeSuccess(ctx, conn)
 	case types.ClientParse:
+		return srv.completeSuccess(ctx, conn)
 	case types.ClientDescribe:
+		return srv.completeSuccess(ctx, conn)
 	case types.ClientBind:
+		return srv.completeSuccess(ctx, conn)
 	case types.ClientFlush:
 		return srv.completeSuccess(ctx, conn)
 	case types.ClientCopyData, types.ClientCopyDone, types.ClientCopyFail:
