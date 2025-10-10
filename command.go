@@ -109,10 +109,12 @@ func (srv *Server) handleCommand(ctx context.Context, conn SQLConnection, t type
 		// TODO: make this a function of connection
 		return srv.handleSimpleQuery(ctx, conn)
 	case types.ClientExecute:
+		return srv.completeSuccess(ctx, conn)
 	case types.ClientParse:
 	case types.ClientDescribe:
 	case types.ClientBind:
 	case types.ClientFlush:
+		return srv.completeSuccess(ctx, conn)
 	case types.ClientCopyData, types.ClientCopyDone, types.ClientCopyFail:
 		// We're supposed to ignore these messages, per the protocol spec. This
 		// state will happen when an error occurs on the server-side during a copy
@@ -141,6 +143,15 @@ func (srv *Server) handleCommand(ctx context.Context, conn SQLConnection, t type
 	return nil
 }
 
+func (srv *Server) completeSuccess(ctx context.Context, cn SQLConnection) error {
+	dw := &dataWriter{
+		ctx:    ctx,
+		client: cn,
+	}
+	dw.Complete("", "OK")
+	return nil
+}
+
 func (srv *Server) handleSimpleQuery(ctx context.Context, cn SQLConnection) error {
 	if srv.SimpleQuery == nil && srv.SQLBackendFactory == nil {
 		return ErrorCode(cn, NewErrUnimplementedMessageType(types.ClientSimpleQuery))
@@ -162,11 +173,7 @@ func (srv *Server) handleSimpleQuery(ctx context.Context, cn SQLConnection) erro
 			if q == "" {
 				if i == len(qArr)-1 {
 					// trailing semicolon, ignore
-					dw := &dataWriter{
-						ctx:    ctx,
-						client: cn,
-					}
-					dw.Complete("", "OK")
+					srv.completeSuccess(ctx, cn)
 					return nil
 				}
 				continue
