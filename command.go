@@ -27,23 +27,24 @@ type SimpleQueryFn func(ctx context.Context, query string, writer DataWriter) er
 
 type CloseFn func(ctx context.Context) error
 
-// consumeCommands consumes incoming commands send over the Postgres wire connection.
+// consumeCommands consumes incoming commands sent over the Postgres wire connection.
 // Commands consumed from the connection are returned through a go channel.
 // Responses for the given message type are written back to the client.
-// This method keeps consuming messages until the client issues a close message
+// This method keeps consuming messages until the client issues a terminate message
 // or the connection is terminated.
+//
+// ReadyForQuery is sent once initially, then only after SimpleQuery completion
+// and Sync messages (per the PostgreSQL extended query protocol).
 func (srv *Server) consumeCommands(ctx context.Context, conn SQLConnection) (err error) {
 	srv.logger.Debug("ready for query... starting to consume commands")
 
-	// TODO(Jeroen): include a indentification value inside the context that
-	// could be used to identify connections at a later stage.
+	// Send initial ReadyForQuery
+	err = readyForQuery(conn, types.ServerIdle)
+	if err != nil {
+		return err
+	}
 
 	for {
-		err = readyForQuery(conn, types.ServerIdle)
-		if err != nil {
-			return err
-		}
-
 		t, length, err := conn.ReadTypedMsg()
 		if err == io.EOF {
 			return nil
@@ -52,6 +53,12 @@ func (srv *Server) consumeCommands(ctx context.Context, conn SQLConnection) (err
 		// NOTE(Jeroen): we could recover from this scenario
 		if errors.Is(err, buffer.ErrMessageSizeExceeded) {
 			err = srv.handleMessageSizeExceeded(conn, conn, err)
+			if err != nil {
+				return err
+			}
+
+			// Send ReadyForQuery after error recovery
+			err = readyForQuery(conn, types.ServerIdle)
 			if err != nil {
 				return err
 			}
@@ -97,28 +104,31 @@ func (srv *Server) handleMessageSizeExceeded(reader buffer.Reader, writer buffer
 
 // handleCommand handles the given client message. A client message includes a
 // message type and reader buffer containing the actual message. The type
-// indecates a action executed by the client.
+// indicates an action executed by the client.
+//
+// For the extended query protocol, ReadyForQuery is NOT sent after each message.
+// It is only sent by handleSync (after Sync) and handleSimpleQuery (after SimpleQuery).
 func (srv *Server) handleCommand(ctx context.Context, conn SQLConnection, t types.ClientMessage) (err error) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
 	switch t {
-	case types.ClientSync:
-		// TODO(Jeroen): client sync received
-		return srv.completeSuccess(ctx, conn)
 	case types.ClientSimpleQuery:
-		// TODO: make this a function of connection
 		return srv.handleSimpleQuery(ctx, conn)
-	case types.ClientExecute:
-		return srv.completeSuccess(ctx, conn)
 	case types.ClientParse:
-		return srv.completeSuccess(ctx, conn)
-	case types.ClientDescribe:
-		return srv.completeSuccess(ctx, conn)
+		return srv.handleParse(ctx, conn)
 	case types.ClientBind:
-		return srv.completeSuccess(ctx, conn)
+		return srv.handleBind(ctx, conn)
+	case types.ClientDescribe:
+		return srv.handleDescribe(ctx, conn)
+	case types.ClientExecute:
+		return srv.handleExecute(ctx, conn)
+	case types.ClientSync:
+		return srv.handleSync(ctx, conn)
 	case types.ClientFlush:
-		return srv.completeSuccess(ctx, conn)
+		return srv.handleFlush(ctx, conn)
+	case types.ClientClose:
+		return srv.handleClose(ctx, conn)
 	case types.ClientCopyData, types.ClientCopyDone, types.ClientCopyFail:
 		// We're supposed to ignore these messages, per the protocol spec. This
 		// state will happen when an error occurs on the server-side during a copy
@@ -126,14 +136,12 @@ func (srv *Server) handleCommand(ctx context.Context, conn SQLConnection, t type
 		// the client, and must then ignore further copy messages. See:
 		// https://github.com/postgres/postgres/blob/6e1dd2773eb60a6ab87b27b8d9391b756e904ac3/src/backend/tcop/postgres.c#L4295
 		break
-	case types.ClientClose:
+	case types.ClientTerminate:
 		err = srv.handleConnClose(ctx)
 		if err != nil {
 			return err
 		}
 
-		return conn.Close()
-	case types.ClientTerminate:
 		err = srv.handleConnTerminate(ctx)
 		if err != nil {
 			return err
@@ -147,14 +155,6 @@ func (srv *Server) handleCommand(ctx context.Context, conn SQLConnection, t type
 	return nil
 }
 
-func (srv *Server) completeSuccess(ctx context.Context, cn SQLConnection) error {
-	dw := &dataWriter{
-		ctx:    ctx,
-		client: cn,
-	}
-	dw.Complete("", "OK")
-	return nil
-}
 
 func (srv *Server) handleSimpleQuery(ctx context.Context, cn SQLConnection) error {
 	if srv.SimpleQuery == nil && srv.SQLBackendFactory == nil {
@@ -177,8 +177,8 @@ func (srv *Server) handleSimpleQuery(ctx context.Context, cn SQLConnection) erro
 			if q == "" {
 				if i == len(qArr)-1 {
 					// trailing semicolon, ignore
-					srv.completeSuccess(ctx, cn)
-					return nil
+					commandComplete(cn, "OK")
+					return readyForQuery(cn, types.ServerIdle)
 				}
 				continue
 			}
@@ -194,7 +194,7 @@ func (srv *Server) handleSimpleQuery(ctx context.Context, cn SQLConnection) erro
 			for {
 				if rdr == nil {
 					dw.Complete("", "OK")
-					return nil
+					return readyForQuery(cn, types.ServerIdle)
 				}
 				res, err := rdr.Read()
 				if err != nil {
@@ -202,7 +202,7 @@ func (srv *Server) handleSimpleQuery(ctx context.Context, cn SQLConnection) erro
 						notices := cn.GetDebugStr()
 						if res == nil {
 							dw.Complete(notices, "OK")
-							return nil
+							return readyForQuery(cn, types.ServerIdle)
 						}
 						if !headersWritten {
 							headersWritten = true
@@ -211,7 +211,7 @@ func (srv *Server) handleSimpleQuery(ctx context.Context, cn SQLConnection) erro
 						srv.writeSQLResultRows(ctx, res, dw)
 						// TODO: add debug messages, configurably
 						dw.Complete(notices, "OK")
-						return nil
+						return readyForQuery(cn, types.ServerIdle)
 					}
 					return ErrorCode(cn, err)
 				}
@@ -233,7 +233,7 @@ func (srv *Server) handleSimpleQuery(ctx context.Context, cn SQLConnection) erro
 		return ErrorCode(cn, err)
 	}
 
-	return nil
+	return readyForQuery(cn, types.ServerIdle)
 }
 
 func (srv *Server) writeSQLResultRows(ctx context.Context, res sqldata.ISQLResult, writer DataWriter) error {
