@@ -158,7 +158,8 @@ func (srv *Server) handleCommand(ctx context.Context, conn SQLConnection, t type
 
 func (srv *Server) handleSimpleQuery(ctx context.Context, cn SQLConnection) error {
 	if srv.SimpleQuery == nil && srv.SQLBackendFactory == nil {
-		return ErrorCode(cn, NewErrUnimplementedMessageType(types.ClientSimpleQuery))
+		ErrorCode(cn, NewErrUnimplementedMessageType(types.ClientSimpleQuery))
+		return readyForQuery(cn, types.ServerIdle)
 	}
 
 	query, err := cn.GetString()
@@ -184,7 +185,8 @@ func (srv *Server) handleSimpleQuery(ctx context.Context, cn SQLConnection) erro
 			}
 			rdr, err := cn.HandleSimpleQuery(ctx, q)
 			if err != nil {
-				return ErrorCode(cn, err)
+				ErrorCode(cn, err)
+				return readyForQuery(cn, types.ServerIdle)
 			}
 			dw := &dataWriter{
 				ctx:    ctx,
@@ -213,7 +215,8 @@ func (srv *Server) handleSimpleQuery(ctx context.Context, cn SQLConnection) erro
 						dw.Complete(notices, "OK")
 						return readyForQuery(cn, types.ServerIdle)
 					}
-					return ErrorCode(cn, err)
+					ErrorCode(cn, err)
+					return readyForQuery(cn, types.ServerIdle)
 				}
 				if !headersWritten {
 					headersWritten = true
@@ -230,7 +233,8 @@ func (srv *Server) handleSimpleQuery(ctx context.Context, cn SQLConnection) erro
 	})
 
 	if err != nil {
-		return ErrorCode(cn, err)
+		ErrorCode(cn, err)
+		return readyForQuery(cn, types.ServerIdle)
 	}
 
 	return readyForQuery(cn, types.ServerIdle)
