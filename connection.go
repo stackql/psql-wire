@@ -24,14 +24,20 @@ type SQLConnection interface {
 	SplitCompoundQuery(string) ([]string, error)
 	GetDebugStr() string
 	HasSQLBackend() bool
+	ExtendedBackend() sqlbackend.IExtendedQueryBackend
+	Statements() PreparedStatementCache
+	Portals() PortalCache
 }
 
 type simpleSqlConnection struct {
-	id         uint64
-	netConn    net.Conn
-	reader     buffer.Reader
-	writer     buffer.Writer
-	sqlBackend sqlbackend.ISQLBackend
+	id              uint64
+	netConn         net.Conn
+	reader          buffer.Reader
+	writer          buffer.Writer
+	sqlBackend      sqlbackend.ISQLBackend
+	extendedBackend sqlbackend.IExtendedQueryBackend
+	statements      PreparedStatementCache
+	portals         PortalCache
 }
 
 func NewSQLConnection(
@@ -41,17 +47,38 @@ func NewSQLConnection(
 	writer buffer.Writer,
 	sqlBackend sqlbackend.ISQLBackend,
 ) SQLConnection {
+	var extBackend sqlbackend.IExtendedQueryBackend
+	if eb, ok := sqlBackend.(sqlbackend.IExtendedQueryBackend); ok {
+		extBackend = eb
+	} else if sqlBackend != nil {
+		extBackend = sqlbackend.NewDefaultExtendedQueryBackend(sqlBackend)
+	}
 	return &simpleSqlConnection{
-		id:         id,
-		netConn:    netConn,
-		reader:     reader,
-		writer:     writer,
-		sqlBackend: sqlBackend,
+		id:              id,
+		netConn:         netConn,
+		reader:          reader,
+		writer:          writer,
+		sqlBackend:      sqlBackend,
+		extendedBackend: extBackend,
+		statements:      NewPreparedStatementCache(),
+		portals:         NewPortalCache(),
 	}
 }
 
 func (c *simpleSqlConnection) HasSQLBackend() bool {
 	return c.sqlBackend != nil
+}
+
+func (c *simpleSqlConnection) ExtendedBackend() sqlbackend.IExtendedQueryBackend {
+	return c.extendedBackend
+}
+
+func (c *simpleSqlConnection) Statements() PreparedStatementCache {
+	return c.statements
+}
+
+func (c *simpleSqlConnection) Portals() PortalCache {
+	return c.portals
 }
 
 func (c *simpleSqlConnection) GetDebugStr() string {
