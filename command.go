@@ -23,6 +23,12 @@ func NewErrUnimplementedMessageType(t types.ClientMessage) error {
 	return psqlerr.WithSeverity(psqlerr.WithCode(err, codes.ConnectionDoesNotExist), psqlerr.LevelFatal)
 }
 
+// errExtendedQueryError is a sentinel error returned by extended query handlers
+// when they have already sent an ErrorResponse to the client. The command loop
+// uses this to enter error state: all subsequent messages are discarded until
+// Sync, which sends ReadyForQuery with a failed-transaction status.
+var errExtendedQueryError = errors.New("extended query error")
+
 type SimpleQueryFn func(ctx context.Context, query string, writer DataWriter) error
 
 type CloseFn func(ctx context.Context) error
@@ -43,6 +49,11 @@ func (srv *Server) consumeCommands(ctx context.Context, conn SQLConnection) (err
 	if err != nil {
 		return err
 	}
+
+	// inErrorState tracks whether an extended query handler has failed.
+	// Per the PostgreSQL protocol, after an error in extended query mode,
+	// all subsequent messages are discarded until a Sync message is received.
+	inErrorState := false
 
 	for {
 		t, length, err := conn.ReadTypedMsg()
@@ -72,7 +83,32 @@ func (srv *Server) consumeCommands(ctx context.Context, conn SQLConnection) (err
 			return err
 		}
 
+		// When in error state, discard all messages except Sync and Terminate.
+		// Sync resets the error state; Terminate always closes the connection.
+		if inErrorState {
+			switch t {
+			case types.ClientSync:
+				inErrorState = false
+				err = readyForQuery(conn, types.ServerTransactionFailed)
+				if err != nil {
+					return err
+				}
+			case types.ClientTerminate:
+				err = srv.handleCommand(ctx, conn, t)
+				if err != nil {
+					return err
+				}
+			default:
+				srv.logger.Debug("discarding message in error state", zap.String("type", string(t)))
+			}
+			continue
+		}
+
 		err = srv.handleCommand(ctx, conn, t)
+		if errors.Is(err, errExtendedQueryError) {
+			inErrorState = true
+			continue
+		}
 		if err != nil {
 			return err
 		}

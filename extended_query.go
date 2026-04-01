@@ -49,7 +49,7 @@ func (srv *Server) handleParse(ctx context.Context, conn SQLConnection) error {
 	if extBackend != nil {
 		resolvedOIDs, err := extBackend.HandleParse(ctx, stmtName, query, paramOIDs)
 		if err != nil {
-			return ErrorCode(conn, err)
+			return extendedError(conn, err)
 		}
 		paramOIDs = resolvedOIDs
 	}
@@ -78,7 +78,7 @@ func (srv *Server) handleBind(ctx context.Context, conn SQLConnection) error {
 
 	stmt, ok := conn.Statements()[stmtName]
 	if !ok {
-		return ErrorCode(conn, errors.New("prepared statement does not exist: "+stmtName))
+		return extendedError(conn, errors.New("prepared statement does not exist: "+stmtName))
 	}
 
 	// Read parameter format codes
@@ -142,7 +142,7 @@ func (srv *Server) handleBind(ctx context.Context, conn SQLConnection) error {
 	if extBackend != nil {
 		err = extBackend.HandleBind(ctx, portalName, stmtName, paramFormats, paramValues, resultFormats)
 		if err != nil {
-			return ErrorCode(conn, err)
+			return extendedError(conn, err)
 		}
 	}
 
@@ -181,14 +181,14 @@ func (srv *Server) handleDescribe(ctx context.Context, conn SQLConnection) error
 	case buffer.PreparePortal:
 		return srv.handleDescribePortal(ctx, conn, name)
 	default:
-		return ErrorCode(conn, errors.New("unknown describe type"))
+		return extendedError(conn, errors.New("unknown describe type"))
 	}
 }
 
 func (srv *Server) handleDescribeStatement(ctx context.Context, conn SQLConnection, name string) error {
 	stmt, ok := conn.Statements()[name]
 	if !ok {
-		return ErrorCode(conn, errors.New("prepared statement does not exist: "+name))
+		return extendedError(conn, errors.New("prepared statement does not exist: "+name))
 	}
 
 	var paramOIDs []uint32
@@ -199,7 +199,7 @@ func (srv *Server) handleDescribeStatement(ctx context.Context, conn SQLConnecti
 		var err error
 		paramOIDs, columns, err = extBackend.HandleDescribeStatement(ctx, name, stmt.Query, stmt.ParamOIDs)
 		if err != nil {
-			return ErrorCode(conn, err)
+			return extendedError(conn, err)
 		}
 	}
 
@@ -223,7 +223,7 @@ func (srv *Server) handleDescribeStatement(ctx context.Context, conn SQLConnecti
 func (srv *Server) handleDescribePortal(ctx context.Context, conn SQLConnection, name string) error {
 	portal, ok := conn.Portals()[name]
 	if !ok {
-		return ErrorCode(conn, errors.New("portal does not exist: "+name))
+		return extendedError(conn, errors.New("portal does not exist: "+name))
 	}
 
 	var columns []sqldata.ISQLColumn
@@ -233,7 +233,7 @@ func (srv *Server) handleDescribePortal(ctx context.Context, conn SQLConnection,
 		var err error
 		columns, err = extBackend.HandleDescribePortal(ctx, name, portal.Statement.Name, portal.Statement.Query, portal.Statement.ParamOIDs)
 		if err != nil {
-			return ErrorCode(conn, err)
+			return extendedError(conn, err)
 		}
 	}
 
@@ -264,7 +264,7 @@ func (srv *Server) handleExecute(ctx context.Context, conn SQLConnection) error 
 
 	portal, ok := conn.Portals()[portalName]
 	if !ok {
-		return ErrorCode(conn, errors.New("portal does not exist: "+portalName))
+		return extendedError(conn, errors.New("portal does not exist: "+portalName))
 	}
 
 	extBackend := conn.ExtendedBackend()
@@ -283,7 +283,7 @@ func (srv *Server) handleExecute(ctx context.Context, conn SQLConnection) error 
 		maxRows,
 	)
 	if err != nil {
-		return ErrorCode(conn, err)
+		return extendedError(conn, err)
 	}
 
 	if rdr == nil {
@@ -313,7 +313,7 @@ func (srv *Server) handleExecute(ctx context.Context, conn SQLConnection) error 
 				dw.Complete(notices, "OK")
 				return nil
 			}
-			return ErrorCode(conn, err)
+			return extendedError(conn, err)
 		}
 		if !headersWritten {
 			headersWritten = true
@@ -349,14 +349,14 @@ func (srv *Server) handleClose(ctx context.Context, conn SQLConnection) error {
 	case buffer.PrepareStatement:
 		if extBackend != nil {
 			if err := extBackend.HandleCloseStatement(ctx, name); err != nil {
-				return ErrorCode(conn, err)
+				return extendedError(conn, err)
 			}
 		}
 		delete(conn.Statements(), name)
 	case buffer.PreparePortal:
 		if extBackend != nil {
 			if err := extBackend.HandleClosePortal(ctx, name); err != nil {
-				return ErrorCode(conn, err)
+				return extendedError(conn, err)
 			}
 		}
 		delete(conn.Portals(), name)
@@ -376,6 +376,13 @@ func (srv *Server) handleSync(ctx context.Context, conn SQLConnection) error {
 // Since our writer sends immediately on End(), this is effectively a no-op.
 func (srv *Server) handleFlush(ctx context.Context, conn SQLConnection) error {
 	return nil
+}
+
+// extendedError sends an ErrorResponse to the client and returns errExtendedQueryError
+// so the command loop enters error state (discards messages until Sync).
+func extendedError(writer buffer.Writer, err error) error {
+	ErrorCode(writer, err)
+	return errExtendedQueryError
 }
 
 // Wire protocol response helpers
