@@ -78,10 +78,30 @@ func (column Column) Define(ctx context.Context, writer buffer.Writer) {
 
 // Write encodes the given source value using the column type definition and connection
 // info. The encoded byte buffer is added to the given write buffer. This method
-// Is used to encode values and return them inside a DataRow message.
+// is used to encode values and return them inside a DataRow message.
+//
+// For text format (FormatCode=0), if the source is already a string or []byte,
+// the raw bytes are written directly without going through pgtype encoding.
+// This preserves the exact representation from the backend (e.g. sqlite's "t"/"f"
+// for booleans) while still advertising the correct OID in RowDescription.
 func (column Column) Write(ctx context.Context, writer buffer.Writer, src interface{}) (err error) {
 	if ctx.Err() != nil {
 		return ctx.Err()
+	}
+
+	// For text format, bypass pgtype encoding when the source is already
+	// a string or []byte. This avoids representation changes (e.g. pgtype.Bool
+	// encoding "true"/"false" instead of the original "t"/"f").
+	if column.Format == TextFormat {
+		if b, ok := asTextBytes(src); ok {
+			if b == nil {
+				writer.AddInt32(-1) // NULL
+				return nil
+			}
+			writer.AddInt32(int32(len(b)))
+			writer.AddBytes(b)
+			return nil
+		}
 	}
 
 	ci := TypeInfo(ctx)
@@ -119,4 +139,20 @@ func (column Column) Write(ctx context.Context, writer buffer.Writer, src interf
 	writer.AddBytes(bb)
 
 	return nil
+}
+
+// asTextBytes extracts raw bytes from string or []byte sources for text-format
+// passthrough. Returns (nil, true) for NULL-representing strings.
+func asTextBytes(src interface{}) ([]byte, bool) {
+	switch v := src.(type) {
+	case string:
+		if strings.ToLower(v) == "null" {
+			return nil, true
+		}
+		return []byte(v), true
+	case []byte:
+		return v, true
+	default:
+		return nil, false
+	}
 }
