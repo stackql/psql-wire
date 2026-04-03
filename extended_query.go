@@ -214,8 +214,9 @@ func (srv *Server) handleDescribeStatement(ctx context.Context, conn SQLConnecti
 	}
 
 	// Send RowDescription or NoData
+	// Describe on a statement has no result formats yet (Bind hasn't happened)
 	if columns != nil {
-		return writeRowDescriptionFromSQLColumns(ctx, conn, columns)
+		return writeRowDescriptionFromSQLColumns(ctx, conn, columns, nil)
 	}
 	return writeNoData(conn)
 }
@@ -238,7 +239,7 @@ func (srv *Server) handleDescribePortal(ctx context.Context, conn SQLConnection,
 	}
 
 	if columns != nil {
-		return writeRowDescriptionFromSQLColumns(ctx, conn, columns)
+		return writeRowDescriptionFromSQLColumns(ctx, conn, columns, portal.ResultFormats)
 	}
 	return writeNoData(conn)
 }
@@ -291,8 +292,9 @@ func (srv *Server) handleExecute(ctx context.Context, conn SQLConnection) error 
 	}
 
 	dw := &dataWriter{
-		ctx:    ctx,
-		client: conn,
+		ctx:           ctx,
+		client:        conn,
+		resultFormats: portal.ResultFormats,
 	}
 
 	var headersWritten bool
@@ -307,7 +309,7 @@ func (srv *Server) handleExecute(ctx context.Context, conn SQLConnection) error 
 				}
 				if !headersWritten {
 					headersWritten = true
-					srv.writeSQLResultHeader(ctx, res, dw)
+					srv.writeSQLResultHeader(ctx, res, dw, portal.ResultFormats)
 				}
 				srv.writeSQLResultRows(ctx, res, dw)
 				dw.Complete(notices, "OK")
@@ -416,17 +418,35 @@ func writeParameterDescription(writer buffer.Writer, paramOIDs []uint32) error {
 	return writer.End()
 }
 
-func writeRowDescriptionFromSQLColumns(ctx context.Context, writer buffer.Writer, columns []sqldata.ISQLColumn) error {
+func writeRowDescriptionFromSQLColumns(ctx context.Context, writer buffer.Writer, columns []sqldata.ISQLColumn, resultFormats []int16) error {
 	var colz Columns
-	for _, c := range columns {
+	for i, c := range columns {
 		colz = append(colz, Column{
 			Table:  c.GetTableId(),
 			Name:   c.GetName(),
 			AttrNo: c.GetAttrNum(),
 			Oid:    oid.Oid(c.GetObjectID()),
 			Width:  c.GetWidth(),
-			Format: TextFormat,
+			Format: resolveResultFormat(resultFormats, i),
 		})
 	}
 	return colz.Define(ctx, writer)
+}
+
+// resolveResultFormat determines the format code for column i based on the
+// result format codes from the Bind message, per the PostgreSQL protocol:
+//   - 0 format codes: all columns use text
+//   - 1 format code:  all columns use that format
+//   - N format codes: each column uses its corresponding format
+func resolveResultFormat(formats []int16, i int) FormatCode {
+	if len(formats) == 0 {
+		return TextFormat
+	}
+	if len(formats) == 1 {
+		return FormatCode(formats[0])
+	}
+	if i < len(formats) {
+		return FormatCode(formats[i])
+	}
+	return TextFormat
 }

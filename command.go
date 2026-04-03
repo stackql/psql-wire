@@ -244,7 +244,7 @@ func (srv *Server) handleSimpleQuery(ctx context.Context, cn SQLConnection) erro
 						}
 						if !headersWritten {
 							headersWritten = true
-							srv.writeSQLResultHeader(ctx, res, dw)
+							srv.writeSQLResultHeader(ctx, res, dw, nil)
 						}
 						srv.writeSQLResultRows(ctx, res, dw)
 						// TODO: add debug messages, configurably
@@ -283,16 +283,16 @@ func (srv *Server) writeSQLResultRows(ctx context.Context, res sqldata.ISQLResul
 	return nil
 }
 
-func (srv *Server) writeSQLResultHeader(ctx context.Context, res sqldata.ISQLResult, writer DataWriter) error {
+func (srv *Server) writeSQLResultHeader(ctx context.Context, res sqldata.ISQLResult, writer DataWriter, resultFormats []int16) error {
 	var colz Columns
-	for _, c := range res.GetColumns() {
+	for i, c := range res.GetColumns() {
 		colz = append(colz,
 			Column{
 				Table:  c.GetTableId(),
 				Name:   c.GetName(),
 				Oid:    oid.Oid(c.GetObjectID()),
 				Width:  c.GetWidth(),
-				Format: TextFormat,
+				Format: resolveResultFormat(resultFormats, i),
 			},
 		)
 	}
