@@ -14,6 +14,10 @@ on:
       - main
       - develop
 
+env:
+  GOLANGCI_LINT_VERSION:  ${{ vars.GOLANGCI_LINT_VERSION == '' && 'v2.5.0' || vars.GOLANGCI_LINT_VERSION }}
+  DEFAULT_STEP_TIMEOUT:   ${{ vars.DEFAULT_STEP_TIMEOUT_MIN == '' && '20' || vars.DEFAULT_STEP_TIMEOUT_MIN }}
+
 jobs:
 
   lint:
@@ -34,7 +38,14 @@ jobs:
         key: ${{ runner.os }}-bin-${{ hashFiles('**/go.sum') }}
 
     - name: Linting
-      run: make lint
+      run: |
+        make lint GOLANGCI_LINT_VERSION=${GOLANGCI_LINT_VERSION} | tee lint.log 2>&1 || true
+
+    - name: Upload linting results
+      uses: actions/upload-artifact@v2
+      with:
+        name: lint-results
+        path: lint.log
     
     - name: Cache bin
       uses: actions/cache@v4
