@@ -49,11 +49,12 @@ var ErrClosedWriter = errors.New("closed writer")
 
 // dataWriter is a implementation of the DataWriter interface.
 type dataWriter struct {
-	columns Columns
-	ctx     context.Context
-	client  buffer.Writer
-	closed  bool
-	written uint64
+	columns       Columns
+	ctx           context.Context
+	client        buffer.Writer
+	closed        bool
+	written       uint64
+	resultFormats []int16 // from Bind message; nil means all text
 }
 
 func (writer *dataWriter) Define(columns Columns) error {
