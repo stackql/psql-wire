@@ -42,7 +42,7 @@ jobs:
         make lint GOLANGCI_LINT_VERSION=${GOLANGCI_LINT_VERSION} | tee lint.log 2>&1 || true
 
     - name: Upload linting results
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v4
       with:
         name: lint-results
         path: lint.log
