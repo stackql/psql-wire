@@ -106,13 +106,6 @@ func (writer *dataWriter) Complete(notices, description string) error {
 		return ErrClosedWriter
 	}
 
-	if writer.written == 0 && writer.columns != nil {
-		err := writer.Empty()
-		if err != nil {
-			return err
-		}
-	}
-
 	defer writer.close()
 	if notices != "" {
 		noticesComplete(writer.client, notices)

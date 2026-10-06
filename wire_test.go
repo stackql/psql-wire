@@ -11,6 +11,7 @@ import (
 	_ "github.com/lib/pq"
 	"github.com/lib/pq/oid"
 	"github.com/stackql/psql-wire/internal/mock"
+	"github.com/stackql/psql-wire/internal/types"
 	"github.com/stackql/psql-wire/pkg/sqlbackend"
 	"github.com/stackql/psql-wire/pkg/sqldata"
 )
@@ -96,6 +97,90 @@ func TestClientConnect(t *testing.T) {
 
 		err = conn.Close(ctx)
 		if err != nil {
+			t.Fatal(err)
+		}
+	})
+}
+
+func TestZeroRowResultRetainsColumnMetadata(t *testing.T) {
+	t.Parallel()
+
+	handler := func(ctx context.Context, query string, writer DataWriter) error {
+		if err := writer.Define(Columns{{
+			Name:   "dependency_name",
+			Oid:    oid.T_text,
+			Width:  -1,
+			Format: TextFormat,
+		}}); err != nil {
+			return err
+		}
+		return writer.Complete("", "SELECT 0")
+	}
+
+	server, err := NewServer(SimpleQuery(handler))
+	if err != nil {
+		t.Fatal(err)
+	}
+	address := TListenAndServe(t, server)
+
+	t.Run("wire messages", func(t *testing.T) {
+		conn, err := net.Dial("tcp", address.String())
+		if err != nil {
+			t.Fatal(err)
+		}
+		client := mock.NewClient(conn)
+		client.Handshake(t)
+		client.Authenticate(t)
+		client.ReadyForQuery(t)
+
+		client.Start(types.ClientSimpleQuery)
+		client.AddString("SELECT dependency_name")
+		client.AddNullTerminate()
+		if err := client.End(); err != nil {
+			t.Fatal(err)
+		}
+
+		for _, expected := range []types.ServerMessage{
+			types.ServerRowDescription,
+			types.ServerCommandComplete,
+			types.ServerReady,
+		} {
+			got, _, err := client.ReadTypedMsg()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got != expected {
+				t.Fatalf("got message %q, want %q", got, expected)
+			}
+		}
+		client.Close(t)
+	})
+
+	t.Run("database sql metadata", func(t *testing.T) {
+		connstr := fmt.Sprintf("host=%s port=%d sslmode=disable", address.IP, address.Port)
+		conn, err := sql.Open("postgres", connstr)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer conn.Close() //nolint:errcheck
+
+		rows, err := conn.Query("SELECT dependency_name")
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer rows.Close() //nolint:errcheck
+
+		columns, err := rows.Columns()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(columns) != 1 || columns[0] != "dependency_name" {
+			t.Fatalf("got columns %v, want [dependency_name]", columns)
+		}
+		if rows.Next() {
+			t.Fatal("zero-row result unexpectedly returned a row")
+		}
+		if err := rows.Err(); err != nil {
 			t.Fatal(err)
 		}
 	})

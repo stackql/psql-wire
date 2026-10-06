@@ -44,8 +44,10 @@ func readDataRowValues(t *testing.T, data []byte) [][]byte {
 			values[i] = nil
 		} else {
 			val := make([]byte, length)
-			if _, err := r.Read(val); err != nil {
-				t.Fatalf("read value for col %d: %v", i, err)
+			if length > 0 {
+				if _, err := r.Read(val); err != nil {
+					t.Fatalf("read value for col %d: %v", i, err)
+				}
 			}
 			values[i] = val
 		}
@@ -206,6 +208,61 @@ func TestColumnWrite_TextBypass_NullHandling(t *testing.T) {
 	values := readDataRowValues(t, buf.Bytes())
 	if values[0] != nil {
 		t.Errorf("expected NULL (nil), got %q", values[0])
+	}
+}
+
+func TestColumnWrite_NullAndEmptyValues(t *testing.T) {
+	ctx := setTypeInfo(context.Background())
+
+	tests := []struct {
+		name       string
+		format     FormatCode
+		src        interface{}
+		wantData   []byte
+		wantIsNull bool
+	}{
+		{name: "text nil interface", format: TextFormat, src: nil, wantIsNull: true},
+		{name: "text nil byte slice", format: TextFormat, src: []byte(nil), wantIsNull: true},
+		{name: "text empty string", format: TextFormat, src: "", wantData: []byte{}},
+		{name: "text empty byte slice", format: TextFormat, src: []byte{}, wantData: []byte{}},
+		{name: "binary nil interface", format: BinaryFormat, src: nil, wantIsNull: true},
+		{name: "binary nil byte slice", format: BinaryFormat, src: []byte(nil), wantIsNull: true},
+		{name: "binary empty string", format: BinaryFormat, src: "", wantData: []byte{}},
+		{name: "binary empty byte slice", format: BinaryFormat, src: []byte{}, wantData: []byte{}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			col := Column{
+				Name:   "test",
+				Oid:    oid.T_text,
+				Width:  -1,
+				Format: tt.format,
+			}
+
+			var buf bytes.Buffer
+			writer := buffer.NewWriter(&buf)
+			if err := (Columns{col}).Write(ctx, writer, []interface{}{tt.src}); err != nil {
+				t.Fatalf("Write error: %v", err)
+			}
+
+			values := readDataRowValues(t, buf.Bytes())
+			if len(values) != 1 {
+				t.Fatalf("got %d values, want 1", len(values))
+			}
+			if tt.wantIsNull {
+				if values[0] != nil {
+					t.Errorf("got %q, want NULL", values[0])
+				}
+				return
+			}
+			if values[0] == nil {
+				t.Fatal("got NULL, want a non-NULL value")
+			}
+			if !bytes.Equal(values[0], tt.wantData) {
+				t.Errorf("got %q, want %q", values[0], tt.wantData)
+			}
+		})
 	}
 }
 
