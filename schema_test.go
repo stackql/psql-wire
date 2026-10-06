@@ -123,10 +123,10 @@ func (factory *schemaTestBackendFactory) NewSQLBackend() (sqlbackend.ISQLBackend
 }
 
 func TestExtendedQueryStreamSchema(t *testing.T) {
-	for _, described := range []bool{false, true} {
+	for _, description := range []string{"execute", "describe execute", "describe no data"} {
 		for _, format := range []FormatCode{TextFormat, BinaryFormat} {
 			for _, kind := range []string{"simple zero rows", "channel no results", "channel rows", "legacy channel rows"} {
-				name := kind + "/" + map[bool]string{false: "execute", true: "describe execute"}[described] +
+				name := kind + "/" + description +
 					"/" + map[FormatCode]string{TextFormat: "text", BinaryFormat: "binary"}[format]
 				t.Run(name, func(t *testing.T) {
 					columns := schemaTestColumns()
@@ -138,6 +138,9 @@ func TestExtendedQueryStreamSchema(t *testing.T) {
 						ISQLBackend:           simple,
 						IExtendedQueryBackend: sqlbackend.NewDefaultExtendedQueryBackend(simple),
 						columns:               columns,
+					}
+					if description == "describe no data" {
+						backend.columns = nil
 					}
 					server, err := NewServer(SQLBackendFactory(&schemaTestBackendFactory{backend: backend}))
 					if err != nil {
@@ -159,12 +162,16 @@ func TestExtendedQueryStreamSchema(t *testing.T) {
 						t.Fatal(err)
 					}
 					expectMsg(t, client, types.ServerBindComplete)
-					if described {
+					if description != "execute" {
 						sendDescribePortal(t, client, "")
-						expectSchema(t, client, format)
+						if description == "describe no data" {
+							expectMsg(t, client, types.ServerNoData)
+						} else {
+							expectSchema(t, client, format)
+						}
 					}
 					sendExecute(t, client, "", 0)
-					if !described {
+					if description != "describe execute" {
 						expectSchema(t, client, format)
 					}
 					expectSchemaRows(t, client, kind, format)
