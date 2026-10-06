@@ -135,19 +135,6 @@ func (column Column) Write(ctx context.Context, writer buffer.Writer, src interf
 		return err
 	}
 
-	if bb == nil {
-		if value, ok := src.(string); ok && value == "" {
-			bb = []byte{}
-		}
-		if value, ok := src.([]byte); ok && value != nil && len(value) == 0 {
-			bb = value
-		}
-		if bb == nil {
-			writer.AddInt32(-1)
-			return nil
-		}
-	}
-
 	writer.AddInt32(int32(len(bb)))
 	writer.AddBytes(bb)
 

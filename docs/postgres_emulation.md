@@ -39,6 +39,22 @@ For `FormatCode=0` (text), string/`[]byte` values bypass `pgtype` encoding and w
 
 `resultFormats` from `Bind` are threaded through to `RowDescription` and data encoding, supporting per-column text/binary format selection per [protocol spec](https://www.postgresql.org/docs/16/protocol-message-formats.html).
 
+### Stream schema and zero-row results
+
+`ISQLResultStream.GetColumns()` returns schema without reading, peeking, or waiting
+for results. Custom stream implementations must add this method. Simple streams
+return their result's columns (or nil for a nil result). Channel streams accept
+schema at construction: `NewChannelSQLResultStream(columns)`. Existing zero-argument
+callers remain valid; when their schema is nil, execution uses the first result's
+columns. Supply schema at construction to preserve metadata even when the channel
+closes without producing any results.
+
+Simple and extended execution define columns once before reading when schema is
+available. Extended execution reuses a successful portal Describe's columns and
+negotiated formats without emitting a duplicate `RowDescription`. Structured
+zero-row results complete normally, not with `EmptyQueryResponse`; explicit
+`DataWriter.Empty()` behavior is unchanged. Standard value encoding is unchanged.
+
 ## What requires stackql-side implementation
 
 The `IExtendedQueryBackend` interface is fully wired. A `DefaultExtendedQueryBackend` delegates to `HandleSimpleQuery`, providing basic compatibility. For full fidelity, stackql implements:
@@ -59,4 +75,3 @@ See [stackql core repository](https://github.com/stackql/stackql) for the backen
 - **Portal suspension** — `Execute` with `maxRows > 0` does not yet suspend and resume portals via `ServerPortalSuspended`.
 - **`FunctionCall` message** — deprecated in PostgreSQL, not implemented.
 - **Notification / `LISTEN`/`NOTIFY`** — async notification messages are not emitted.
-

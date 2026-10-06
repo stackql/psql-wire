@@ -14,6 +14,7 @@ type Portal struct {
 	ParamFormats  []int16
 	ParamValues   [][]byte
 	ResultFormats []int16
+	columns       Columns
 }
 
 // PreparedStatementCache stores prepared statements for a connection.

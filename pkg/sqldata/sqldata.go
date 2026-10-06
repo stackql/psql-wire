@@ -15,6 +15,8 @@ type ISQLResult interface {
 }
 
 type ISQLResultStream interface {
+	// GetColumns returns schema without reading or waiting for a result.
+	GetColumns() []ISQLColumn
 	Read() (ISQLResult, error)
 	Write(ISQLResult) error
 	Close() error
@@ -27,6 +29,7 @@ type SimpleSQLResultStream struct {
 type ChannelSQLResultStream struct {
 	res              chan ISQLResult
 	nextResultCached ISQLResult
+	columns          []ISQLColumn
 }
 
 func NewSimpleSQLResultStream(res ISQLResult) ISQLResultStream {
@@ -35,10 +38,26 @@ func NewSimpleSQLResultStream(res ISQLResult) ISQLResultStream {
 	}
 }
 
-func NewChannelSQLResultStream() ISQLResultStream {
-	return &ChannelSQLResultStream{
-		res: make(chan ISQLResult, 1),
+func NewChannelSQLResultStream(columns ...[]ISQLColumn) ISQLResultStream {
+	var schema []ISQLColumn
+	if len(columns) > 0 {
+		schema = columns[0]
 	}
+	return &ChannelSQLResultStream{
+		res:     make(chan ISQLResult, 1),
+		columns: schema,
+	}
+}
+
+func (srs *SimpleSQLResultStream) GetColumns() []ISQLColumn {
+	if srs.res == nil {
+		return nil
+	}
+	return srs.res.GetColumns()
+}
+
+func (srs *ChannelSQLResultStream) GetColumns() []ISQLColumn {
+	return srs.columns
 }
 
 func (srs *SimpleSQLResultStream) Read() (ISQLResult, error) {
