@@ -39,6 +39,27 @@ For `FormatCode=0` (text), string/`[]byte` values bypass `pgtype` encoding and w
 
 `resultFormats` from `Bind` are threaded through to `RowDescription` and data encoding, supporting per-column text/binary format selection per [protocol spec](https://www.postgresql.org/docs/16/protocol-message-formats.html).
 
+### Stream schema and zero-row results
+
+`ISQLResultStream.GetColumns()` returns schema without reading, peeking, or waiting
+for results. Custom stream implementations must add this method. Simple streams
+return their result's columns (or nil for a nil result). Channel streams accept
+one required `ColumnProvider` handle: `NewChannelSQLResultStream(result)`.
+`ISQLResult` already satisfies this interface. The getter delegates on every
+call; providers must supply schema without consuming results. A nil provider
+returns nil schema. Zero-argument construction is no longer supported; a
+zero-column result must supply a provider returning an empty slice. Supply a
+schema provider to preserve metadata even when the channel closes without
+producing any results.
+
+Simple and extended execution define columns once before reading when schema is
+available. Extended execution reuses a successful portal Describe's columns and
+negotiated formats without emitting a duplicate `RowDescription`. Structured
+zero-row results complete normally, not with `EmptyQueryResponse`.
+`DataWriter.Empty()` has been removed. Actual empty statements are handled by
+the simple/extended protocol handlers independently of result writers, using
+`EmptyQueryResponse` rather than `CommandComplete`. Standard value encoding is unchanged.
+
 ## What requires stackql-side implementation
 
 The `IExtendedQueryBackend` interface is fully wired. A `DefaultExtendedQueryBackend` delegates to `HandleSimpleQuery`, providing basic compatibility. For full fidelity, stackql implements:
@@ -59,4 +80,3 @@ See [stackql core repository](https://github.com/stackql/stackql) for the backen
 - **Portal suspension** — `Execute` with `maxRows > 0` does not yet suspend and resume portals via `ServerPortalSuspended`.
 - **`FunctionCall` message** — deprecated in PostgreSQL, not implemented.
 - **Notification / `LISTEN`/`NOTIFY`** — async notification messages are not emitted.
-

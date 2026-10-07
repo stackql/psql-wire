@@ -6,6 +6,11 @@ import (
 	"io"
 )
 
+// ColumnProvider supplies result schema on demand without consuming results.
+type ColumnProvider interface {
+	GetColumns() []ISQLColumn
+}
+
 type ISQLResult interface {
 	GetColumns() []ISQLColumn
 	GetRowsAffected() uint64
@@ -15,6 +20,8 @@ type ISQLResult interface {
 }
 
 type ISQLResultStream interface {
+	// GetColumns returns schema without reading or waiting for a result.
+	GetColumns() []ISQLColumn
 	Read() (ISQLResult, error)
 	Write(ISQLResult) error
 	Close() error
@@ -27,6 +34,7 @@ type SimpleSQLResultStream struct {
 type ChannelSQLResultStream struct {
 	res              chan ISQLResult
 	nextResultCached ISQLResult
+	provider         ColumnProvider
 }
 
 func NewSimpleSQLResultStream(res ISQLResult) ISQLResultStream {
@@ -35,10 +43,25 @@ func NewSimpleSQLResultStream(res ISQLResult) ISQLResultStream {
 	}
 }
 
-func NewChannelSQLResultStream() ISQLResultStream {
+func NewChannelSQLResultStream(provider ColumnProvider) ISQLResultStream {
 	return &ChannelSQLResultStream{
-		res: make(chan ISQLResult, 1),
+		res:      make(chan ISQLResult, 1),
+		provider: provider,
 	}
+}
+
+func (srs *SimpleSQLResultStream) GetColumns() []ISQLColumn {
+	if srs.res == nil {
+		return nil
+	}
+	return srs.res.GetColumns()
+}
+
+func (srs *ChannelSQLResultStream) GetColumns() []ISQLColumn {
+	if srs.provider == nil {
+		return nil
+	}
+	return srs.provider.GetColumns()
 }
 
 func (srs *SimpleSQLResultStream) Read() (ISQLResult, error) {

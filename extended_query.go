@@ -3,7 +3,6 @@ package wire
 import (
 	"context"
 	"errors"
-	"io"
 
 	"github.com/lib/pq/oid"
 	"github.com/stackql/psql-wire/internal/buffer"
@@ -239,8 +238,14 @@ func (srv *Server) handleDescribePortal(ctx context.Context, conn SQLConnection,
 	}
 
 	if columns != nil {
-		return writeRowDescriptionFromSQLColumns(ctx, conn, columns, portal.ResultFormats)
+		colz := sqlColumns(columns, portal.ResultFormats)
+		if err := colz.Define(ctx, conn); err != nil {
+			return err
+		}
+		portal.columns = colz
+		return nil
 	}
+	portal.columns = nil
 	return writeNoData(conn)
 }
 
@@ -266,6 +271,10 @@ func (srv *Server) handleExecute(ctx context.Context, conn SQLConnection) error 
 	portal, ok := conn.Portals()[portalName]
 	if !ok {
 		return extendedError(conn, errors.New("portal does not exist: "+portalName))
+	}
+
+	if isEmptyQuery(portal.Statement.Query) {
+		return emptyQuery(conn)
 	}
 
 	extBackend := conn.ExtendedBackend()
@@ -294,37 +303,15 @@ func (srv *Server) handleExecute(ctx context.Context, conn SQLConnection) error 
 	dw := &dataWriter{
 		ctx:           ctx,
 		client:        conn,
+		columns:       portal.columns,
 		resultFormats: portal.ResultFormats,
 	}
 
-	var headersWritten bool
-	for {
-		res, err := rdr.Read()
-		if err != nil {
-			if errors.Is(err, io.EOF) {
-				notices := conn.GetDebugStr()
-				if res == nil {
-					dw.Complete(notices, "OK")
-					return nil
-				}
-				if !headersWritten {
-					headersWritten = true
-					srv.writeSQLResultHeader(ctx, res, dw, portal.ResultFormats)
-				}
-				srv.writeSQLResultRows(ctx, res, dw)
-				dw.Complete(notices, "OK")
-				return nil
-			}
-			return extendedError(conn, err)
-		}
-		if !headersWritten {
-			headersWritten = true
-			// For extended query, we don't send RowDescription here if Describe already sent it.
-			// However, the dataWriter.Define will handle this correctly since columns may already be set.
-			dw.Define(nil)
-		}
-		srv.writeSQLResultRows(ctx, res, dw)
+	err = srv.writeSQLResultStream(rdr, dw, portal.ResultFormats)
+	if err != nil {
+		return extendedError(conn, err)
 	}
+	return dw.Complete(conn.GetDebugStr(), "OK")
 }
 
 // handleClose handles the Close message ('C') of the extended query protocol.
@@ -419,7 +406,11 @@ func writeParameterDescription(writer buffer.Writer, paramOIDs []uint32) error {
 }
 
 func writeRowDescriptionFromSQLColumns(ctx context.Context, writer buffer.Writer, columns []sqldata.ISQLColumn, resultFormats []int16) error {
-	var colz Columns
+	return sqlColumns(columns, resultFormats).Define(ctx, writer)
+}
+
+func sqlColumns(columns []sqldata.ISQLColumn, resultFormats []int16) Columns {
+	colz := make(Columns, 0, len(columns))
 	for i, c := range columns {
 		colz = append(colz, Column{
 			Table:  c.GetTableId(),
@@ -430,7 +421,7 @@ func writeRowDescriptionFromSQLColumns(ctx context.Context, writer buffer.Writer
 			Format: resolveResultFormat(resultFormats, i),
 		})
 	}
-	return colz.Define(ctx, writer)
+	return colz
 }
 
 // resolveResultFormat determines the format code for column i based on the

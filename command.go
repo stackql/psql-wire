@@ -5,8 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strings"
 
-	"github.com/lib/pq/oid"
 	"github.com/stackql/psql-wire/codes"
 	psqlerr "github.com/stackql/psql-wire/errors"
 	"github.com/stackql/psql-wire/internal/buffer"
@@ -191,7 +191,6 @@ func (srv *Server) handleCommand(ctx context.Context, conn SQLConnection, t type
 	return nil
 }
 
-
 func (srv *Server) handleSimpleQuery(ctx context.Context, cn SQLConnection) error {
 	if srv.SimpleQuery == nil && srv.SQLBackendFactory == nil {
 		ErrorCode(cn, NewErrUnimplementedMessageType(types.ClientSimpleQuery))
@@ -204,6 +203,13 @@ func (srv *Server) handleSimpleQuery(ctx context.Context, cn SQLConnection) erro
 	}
 
 	srv.logger.Debug("incoming query", zap.String("query", query))
+
+	if isEmptyQuery(query) {
+		if err = emptyQuery(cn); err != nil {
+			return err
+		}
+		return readyForQuery(cn, types.ServerIdle)
+	}
 
 	if cn.HasSQLBackend() {
 		qArr, err := cn.SplitCompoundQuery(query)
@@ -228,38 +234,18 @@ func (srv *Server) handleSimpleQuery(ctx context.Context, cn SQLConnection) erro
 				ctx:    ctx,
 				client: cn,
 			}
-			var headersWritten bool
-			for {
-				if rdr == nil {
-					dw.Complete("", "OK")
-					return readyForQuery(cn, types.ServerIdle)
+			err = srv.writeSQLResultStream(rdr, dw, nil)
+			if err != nil {
+				if writeErr := ErrorCode(cn, err); writeErr != nil {
+					return writeErr
 				}
-				res, err := rdr.Read()
-				if err != nil {
-					if errors.Is(err, io.EOF) {
-						notices := cn.GetDebugStr()
-						if res == nil {
-							dw.Complete(notices, "OK")
-							return readyForQuery(cn, types.ServerIdle)
-						}
-						if !headersWritten {
-							headersWritten = true
-							srv.writeSQLResultHeader(ctx, res, dw, nil)
-						}
-						srv.writeSQLResultRows(ctx, res, dw)
-						// TODO: add debug messages, configurably
-						dw.Complete(notices, "OK")
-						return readyForQuery(cn, types.ServerIdle)
-					}
-					ErrorCode(cn, err)
-					return readyForQuery(cn, types.ServerIdle)
-				}
-				if !headersWritten {
-					headersWritten = true
-					dw.Define(nil)
-				}
-				srv.writeSQLResultRows(ctx, res, dw)
+				return readyForQuery(cn, types.ServerIdle)
 			}
+			err = dw.Complete(cn.GetDebugStr(), "OK")
+			if err != nil {
+				return err
+			}
+			return readyForQuery(cn, types.ServerIdle)
 		}
 	}
 
@@ -276,27 +262,51 @@ func (srv *Server) handleSimpleQuery(ctx context.Context, cn SQLConnection) erro
 	return readyForQuery(cn, types.ServerIdle)
 }
 
-func (srv *Server) writeSQLResultRows(ctx context.Context, res sqldata.ISQLResult, writer DataWriter) error {
-	for _, r := range res.GetRows() {
-		writer.Row(r.GetRowDataForPgWire())
-	}
-	return nil
+func isEmptyQuery(query string) bool {
+	return strings.Trim(query, " \t\r\n;") == ""
 }
 
-func (srv *Server) writeSQLResultHeader(ctx context.Context, res sqldata.ISQLResult, writer DataWriter, resultFormats []int16) error {
-	var colz Columns
-	for i, c := range res.GetColumns() {
-		colz = append(colz,
-			Column{
-				Table:  c.GetTableId(),
-				Name:   c.GetName(),
-				Oid:    oid.Oid(c.GetObjectID()),
-				Width:  c.GetWidth(),
-				Format: resolveResultFormat(resultFormats, i),
-			},
-		)
+func (srv *Server) writeSQLResultStream(
+	stream sqldata.ISQLResultStream,
+	writer *dataWriter,
+	resultFormats []int16,
+) error {
+	if stream == nil {
+		return nil
 	}
-	return writer.Define(colz)
+	if columns := stream.GetColumns(); columns != nil && writer.columns == nil {
+		if err := writer.Define(sqlColumns(columns, resultFormats)); err != nil {
+			return err
+		}
+	}
+	for {
+		result, err := stream.Read()
+		if err != nil && !errors.Is(err, io.EOF) {
+			return err
+		}
+		if result != nil {
+			if writeErr := srv.writeSQLResult(result, writer, resultFormats); writeErr != nil {
+				return writeErr
+			}
+		}
+		if errors.Is(err, io.EOF) {
+			return nil
+		}
+	}
+}
+
+func (srv *Server) writeSQLResult(result sqldata.ISQLResult, writer *dataWriter, resultFormats []int16) error {
+	if writer.columns == nil {
+		if err := writer.Define(sqlColumns(result.GetColumns(), resultFormats)); err != nil {
+			return err
+		}
+	}
+	for _, row := range result.GetRows() {
+		if err := writer.Row(row.GetRowDataForPgWire()); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (srv *Server) handleConnClose(ctx context.Context) error {
