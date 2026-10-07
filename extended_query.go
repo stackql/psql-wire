@@ -273,6 +273,10 @@ func (srv *Server) handleExecute(ctx context.Context, conn SQLConnection) error 
 		return extendedError(conn, errors.New("portal does not exist: "+portalName))
 	}
 
+	if isEmptyQuery(portal.Statement.Query) {
+		return emptyQuery(conn)
+	}
+
 	extBackend := conn.ExtendedBackend()
 	if extBackend == nil {
 		return commandComplete(conn, "OK")

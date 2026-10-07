@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/stackql/psql-wire/codes"
 	psqlerr "github.com/stackql/psql-wire/errors"
@@ -203,6 +204,13 @@ func (srv *Server) handleSimpleQuery(ctx context.Context, cn SQLConnection) erro
 
 	srv.logger.Debug("incoming query", zap.String("query", query))
 
+	if isEmptyQuery(query) {
+		if err = emptyQuery(cn); err != nil {
+			return err
+		}
+		return readyForQuery(cn, types.ServerIdle)
+	}
+
 	if cn.HasSQLBackend() {
 		qArr, err := cn.SplitCompoundQuery(query)
 		if err != nil {
@@ -252,6 +260,10 @@ func (srv *Server) handleSimpleQuery(ctx context.Context, cn SQLConnection) erro
 	}
 
 	return readyForQuery(cn, types.ServerIdle)
+}
+
+func isEmptyQuery(query string) bool {
+	return strings.Trim(query, " \t\r\n;") == ""
 }
 
 func (srv *Server) writeSQLResultStream(

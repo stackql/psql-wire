@@ -32,14 +32,9 @@ func TestChannelSQLResultStreamGetColumns(t *testing.T) {
 	columns := []ISQLColumn{
 		NewSQLColumn(NewSQLTable(0, ""), "id", 0, 23, 4, -1, "text"),
 	}
-	for _, supplied := range []bool{false, true} {
-		t.Run(map[bool]string{false: "legacy", true: "supplied schema"}[supplied], func(t *testing.T) {
-			stream := NewChannelSQLResultStream()
-			var want []ISQLColumn
-			if supplied {
-				stream = NewChannelSQLResultStream(NewSQLResult(columns, 0, 0, nil))
-				want = columns
-			}
+	for _, want := range [][]ISQLColumn{columns, {}} {
+		t.Run(map[bool]string{false: "zero columns", true: "columns"}[len(want) > 0], func(t *testing.T) {
+			stream := NewChannelSQLResultStream(NewSQLResult(want, 0, 0, nil))
 
 			done := make(chan []ISQLColumn, 1)
 			go func() { done <- stream.GetColumns() }()
@@ -52,7 +47,7 @@ func TestChannelSQLResultStreamGetColumns(t *testing.T) {
 				t.Fatal("GetColumns blocked on an empty channel")
 			}
 
-			result := NewSQLResult(columns, 0, 0, nil)
+			result := NewSQLResult(want, 0, 0, nil)
 			if err := stream.Write(result); err != nil {
 				t.Fatal(err)
 			}
@@ -61,7 +56,7 @@ func TestChannelSQLResultStreamGetColumns(t *testing.T) {
 			}
 			for i := 0; i < 2; i++ {
 				if !reflect.DeepEqual(stream.GetColumns(), want) {
-					t.Fatal("GetColumns changed the constructor schema")
+					t.Fatal("GetColumns changed the provider schema")
 				}
 			}
 			got, err := stream.Read()

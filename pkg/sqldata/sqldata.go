@@ -43,11 +43,7 @@ func NewSimpleSQLResultStream(res ISQLResult) ISQLResultStream {
 	}
 }
 
-func NewChannelSQLResultStream(providers ...ColumnProvider) ISQLResultStream {
-	var provider ColumnProvider
-	if len(providers) > 0 {
-		provider = providers[0]
-	}
+func NewChannelSQLResultStream(provider ColumnProvider) ISQLResultStream {
 	return &ChannelSQLResultStream{
 		res:      make(chan ISQLResult, 1),
 		provider: provider,

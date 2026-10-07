@@ -30,10 +30,7 @@ func schemaTestStream(kind string, columns []sqldata.ISQLColumn) sqldata.ISQLRes
 		_ = stream.Close()
 		return stream
 	default:
-		stream := sqldata.NewChannelSQLResultStream()
-		if kind == "channel rows" {
-			stream = sqldata.NewChannelSQLResultStream(sqldata.NewSQLResult(columns, 0, 0, nil))
-		}
+		stream := sqldata.NewChannelSQLResultStream(sqldata.NewSQLResult(columns, 0, 0, nil))
 		go func() {
 			for _, value := range []int32{1, 2} {
 				_ = stream.Write(sqldata.NewSQLResult(columns, 0, 0,
@@ -58,7 +55,7 @@ func expectSchema(t *testing.T, client *mock.Client, format FormatCode) {
 
 func expectSchemaRows(t *testing.T, client *mock.Client, kind string, format FormatCode) {
 	t.Helper()
-	if kind != "channel rows" && kind != "legacy channel rows" {
+	if kind != "channel rows" {
 		return
 	}
 	for _, value := range []int32{1, 2} {
@@ -77,7 +74,7 @@ func expectSchemaRows(t *testing.T, client *mock.Client, kind string, format For
 }
 
 func TestSimpleQueryStreamSchema(t *testing.T) {
-	for _, kind := range []string{"simple zero rows", "channel no results", "channel rows", "legacy channel rows"} {
+	for _, kind := range []string{"simple zero rows", "channel no results", "channel rows"} {
 		t.Run(kind, func(t *testing.T) {
 			callback := func(context.Context, string) (sqldata.ISQLResultStream, error) {
 				return schemaTestStream(kind, schemaTestColumns()), nil
@@ -125,7 +122,7 @@ func (factory *schemaTestBackendFactory) NewSQLBackend() (sqlbackend.ISQLBackend
 func TestExtendedQueryStreamSchema(t *testing.T) {
 	for _, description := range []string{"execute", "describe execute", "describe no data"} {
 		for _, format := range []FormatCode{TextFormat, BinaryFormat} {
-			for _, kind := range []string{"simple zero rows", "channel no results", "channel rows", "legacy channel rows"} {
+			for _, kind := range []string{"simple zero rows", "channel no results", "channel rows"} {
 				name := kind + "/" + description +
 					"/" + map[FormatCode]string{TextFormat: "text", BinaryFormat: "binary"}[format]
 				t.Run(name, func(t *testing.T) {
@@ -187,15 +184,88 @@ func TestExtendedQueryStreamSchema(t *testing.T) {
 
 func TestExplicitEmptyQueryResponse(t *testing.T) {
 	var output bytes.Buffer
-	writer := &dataWriter{ctx: context.Background(), client: buffer.NewWriter(&output), columns: Columns{}}
-	if err := writer.Empty(); err != nil {
+	if err := emptyQuery(buffer.NewWriter(&output)); err != nil {
 		t.Fatal(err)
 	}
 	if !bytes.Equal(output.Bytes(), []byte{'I', 0, 0, 0, 4}) {
 		t.Fatalf("unexpected empty query response: %x", output.Bytes())
 	}
+}
+
+func TestEmptyStatementsWireProtocol(t *testing.T) {
+	for _, query := range []string{"", " \t\r\n", ";", " ; ; \n"} {
+		for _, path := range []string{"simple callback", "simple backend", "extended"} {
+			t.Run(path+"/"+query, func(t *testing.T) {
+				callback := func(context.Context, string) (sqldata.ISQLResultStream, error) {
+					return nil, errors.New("empty statement must not execute the backend")
+				}
+				option := SQLBackendFactory(sqlbackend.NewSimpleSQLBackendFactory(callback))
+				if path == "simple callback" {
+					option = SimpleQuery(func(context.Context, string, DataWriter) error {
+						return errors.New("empty statement must not execute the callback")
+					})
+				}
+				server, err := NewServer(option)
+				if err != nil {
+					t.Fatal(err)
+				}
+				client := connectAndHandshake(t, TListenAndServe(t, server))
+				if path == "extended" {
+					sendParse(t, client, "", query, nil)
+					expectMsg(t, client, types.ServerParseComplete)
+					sendBind(t, client, "", "")
+					expectMsg(t, client, types.ServerBindComplete)
+					sendExecute(t, client, "", 0)
+				} else {
+					client.Start(types.ClientSimpleQuery)
+					client.AddString(query)
+					client.AddNullTerminate()
+					if err := client.End(); err != nil {
+						t.Fatal(err)
+					}
+				}
+				expectMsg(t, client, types.ServerEmptyQuery)
+				if len(client.PeekMsg()) != 0 {
+					t.Fatal("EmptyQueryResponse should have no payload")
+				}
+				if path == "extended" {
+					sendSync(t, client)
+				}
+				expectReadyForQuery(t, client, types.ServerIdle)
+				client.Close(t)
+			})
+		}
+	}
+}
+
+func TestZeroColumnResultCompletesNormally(t *testing.T) {
+	result := sqldata.NewSQLResult([]sqldata.ISQLColumn{}, 0, 0, nil)
+	stream := sqldata.NewChannelSQLResultStream(result)
+	if err := stream.Close(); err != nil {
+		t.Fatal(err)
+	}
+	var output bytes.Buffer
+	writer := &dataWriter{ctx: context.Background(), client: buffer.NewWriter(&output)}
+	if err := (&Server{}).writeSQLResultStream(stream, writer, nil); err != nil {
+		t.Fatal(err)
+	}
+	if err := writer.Complete("", "OK"); err != nil {
+		t.Fatal(err)
+	}
+	client := mock.NewReader(&output)
+	got, _, err := client.ReadTypedMsg()
+	if err != nil || got != types.ServerRowDescription || !bytes.Equal(client.PeekMsg(), []byte{0, 0}) {
+		t.Fatalf("expected zero-column RowDescription, got %q, %v", got, err)
+	}
+	got, _, err = client.ReadTypedMsg()
+	if err != nil || got != types.ServerCommandComplete {
+		t.Fatalf("expected CommandComplete, got %q, %v", got, err)
+	}
+	if _, _, err := client.ReadTypedMsg(); !errors.Is(err, io.EOF) {
+		t.Fatalf("unexpected additional message: %v", err)
+	}
 	if err := writer.Complete("", "OK"); !errors.Is(err, ErrClosedWriter) {
-		t.Fatalf("Complete after Empty = %v, want ErrClosedWriter", err)
+		t.Fatalf("second Complete = %v, want ErrClosedWriter", err)
 	}
 }
 

@@ -23,10 +23,6 @@ type DataWriter interface {
 	// values are encoded as NULL values.
 	Row([]interface{}) error
 
-	// Empty announces to the client a empty response and that no data rows should
-	// be expected.
-	Empty() error
-
 	// Complete announces to the client that the command has been completed and
 	// no further data should be expected.
 	Complete(notices string, description string) error
@@ -40,10 +36,6 @@ var ErrColumnsDefined = errors.New("columns have already been defined")
 // yet been defined.
 var ErrUndefinedColumns = errors.New("columns have not been defined")
 
-// ErrDataWritten is thrown when an empty result is attempted to be send to the
-// client while data has already been written.
-var ErrDataWritten = errors.New("data has already been written")
-
 // ErrClosedWriter is thrown when the data writer has been closed
 var ErrClosedWriter = errors.New("closed writer")
 
@@ -53,7 +45,6 @@ type dataWriter struct {
 	ctx           context.Context
 	client        buffer.Writer
 	closed        bool
-	written       uint64
 	resultFormats []int16 // from Bind message; nil means all text
 }
 
@@ -79,26 +70,7 @@ func (writer *dataWriter) Row(values []interface{}) error {
 		return ErrUndefinedColumns
 	}
 
-	writer.written++
-
 	return writer.columns.Write(writer.ctx, writer.client, values)
-}
-
-func (writer *dataWriter) Empty() error {
-	if writer.closed {
-		return ErrClosedWriter
-	}
-
-	if writer.columns == nil {
-		return ErrUndefinedColumns
-	}
-
-	if writer.written != 0 {
-		return ErrDataWritten
-	}
-
-	defer writer.close()
-	return emptyQuery(writer.client)
 }
 
 func (writer *dataWriter) Complete(notices, description string) error {
