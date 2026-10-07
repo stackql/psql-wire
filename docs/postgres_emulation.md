@@ -44,9 +44,12 @@ For `FormatCode=0` (text), string/`[]byte` values bypass `pgtype` encoding and w
 `ISQLResultStream.GetColumns()` returns schema without reading, peeking, or waiting
 for results. Custom stream implementations must add this method. Simple streams
 return their result's columns (or nil for a nil result). Channel streams accept
-schema at construction: `NewChannelSQLResultStream(columns)`. Existing zero-argument
+an optional `ColumnProvider` handle: `NewChannelSQLResultStream(result)`.
+`ISQLResult` already satisfies this interface. The getter delegates on every
+call; providers must supply schema without consuming results. A nil provider
+returns nil schema. Existing zero-argument
 callers remain valid; when their schema is nil, execution uses the first result's
-columns. Supply schema at construction to preserve metadata even when the channel
+columns. Supply a schema provider to preserve metadata even when the channel
 closes without producing any results.
 
 Simple and extended execution define columns once before reading when schema is

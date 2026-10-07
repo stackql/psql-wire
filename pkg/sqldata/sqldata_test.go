@@ -37,9 +37,10 @@ func TestChannelSQLResultStreamGetColumns(t *testing.T) {
 			stream := NewChannelSQLResultStream()
 			var want []ISQLColumn
 			if supplied {
-				stream = NewChannelSQLResultStream(columns)
+				stream = NewChannelSQLResultStream(NewSQLResult(columns, 0, 0, nil))
 				want = columns
 			}
+
 			done := make(chan []ISQLColumn, 1)
 			go func() { done <- stream.GetColumns() }()
 			select {
@@ -68,5 +69,51 @@ func TestChannelSQLResultStreamGetColumns(t *testing.T) {
 				t.Fatalf("Read after GetColumns = (%v, %v), want original result and EOF", got, err)
 			}
 		})
+	}
+}
+
+type countingColumnProvider struct {
+	columns []ISQLColumn
+	calls   int
+}
+
+func (provider *countingColumnProvider) GetColumns() []ISQLColumn {
+	provider.calls++
+	return provider.columns
+}
+
+func TestChannelSQLResultStreamDelegatesGetColumns(t *testing.T) {
+	provider := &countingColumnProvider{}
+	stream := NewChannelSQLResultStream(provider)
+	if provider.calls != 0 {
+		t.Fatal("constructor called the column provider")
+	}
+	if stream.GetColumns() != nil || provider.calls != 1 {
+		t.Fatal("GetColumns did not delegate to the provider")
+	}
+	provider.columns = []ISQLColumn{
+		NewSQLColumn(NewSQLTable(0, ""), "id", 0, 23, 4, -1, "text"),
+	}
+	result := NewSQLResult(provider.columns, 0, 0, nil)
+	if err := stream.Write(result); err != nil {
+		t.Fatal(err)
+	}
+	if err := stream.Close(); err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < 2; i++ {
+		if !reflect.DeepEqual(stream.GetColumns(), provider.columns) {
+			t.Fatal("GetColumns returned a stale schema")
+		}
+	}
+	if provider.calls != 3 {
+		t.Fatalf("provider called %d times, want 3", provider.calls)
+	}
+	got, err := stream.Read()
+	if got != result || !errors.Is(err, io.EOF) {
+		t.Fatalf("Read after GetColumns = (%v, %v), want original result and EOF", got, err)
+	}
+	if NewChannelSQLResultStream(nil).GetColumns() != nil {
+		t.Fatal("nil provider should have nil schema")
 	}
 }

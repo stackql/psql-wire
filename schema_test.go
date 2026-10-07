@@ -26,13 +26,13 @@ func schemaTestStream(kind string, columns []sqldata.ISQLColumn) sqldata.ISQLRes
 	case "simple zero rows":
 		return sqldata.NewSimpleSQLResultStream(sqldata.NewSQLResult(columns, 0, 0, nil))
 	case "channel no results":
-		stream := sqldata.NewChannelSQLResultStream(columns)
+		stream := sqldata.NewChannelSQLResultStream(sqldata.NewSQLResult(columns, 0, 0, nil))
 		_ = stream.Close()
 		return stream
 	default:
 		stream := sqldata.NewChannelSQLResultStream()
 		if kind == "channel rows" {
-			stream = sqldata.NewChannelSQLResultStream(columns)
+			stream = sqldata.NewChannelSQLResultStream(sqldata.NewSQLResult(columns, 0, 0, nil))
 		}
 		go func() {
 			for _, value := range []int32{1, 2} {
