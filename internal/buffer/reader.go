@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/binary"
+	"fmt"
 	"io"
 	"unsafe"
 
@@ -191,6 +192,10 @@ func (reader *simpleReader) GetPrepareType() (PrepareType, error) {
 
 // GetBytes returns the buffer's contents as a []byte.
 func (reader *simpleReader) GetBytes(n int) ([]byte, error) {
+	if n < 0 {
+		return nil, fmt.Errorf("negative byte count %d", n)
+	}
+
 	if len(reader.Msg) < n {
 		return nil, NewInsufficientData(len(reader.Msg))
 	}

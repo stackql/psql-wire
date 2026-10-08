@@ -192,7 +192,7 @@ func (srv *Server) handleCommand(ctx context.Context, conn SQLConnection, t type
 }
 
 func (srv *Server) handleSimpleQuery(ctx context.Context, cn SQLConnection) error {
-	if srv.SimpleQuery == nil && srv.SQLBackendFactory == nil {
+	if srv.SimpleQuery == nil && !cn.HasSQLBackend() {
 		ErrorCode(cn, NewErrUnimplementedMessageType(types.ClientSimpleQuery))
 		return readyForQuery(cn, types.ServerIdle)
 	}

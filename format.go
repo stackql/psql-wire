@@ -11,11 +11,23 @@ type FormatCode int16
 
 // Encoder returns the format encoder for the given data type
 func (code FormatCode) Encoder(t *pgtype.DataType) FormatEncoder {
+	if t == nil || t.Value == nil {
+		return unknownEncoderfunc(fmt.Errorf("format %d has no data type value", code))
+	}
+
 	switch code {
 	case TextFormat:
-		return t.Value.(pgtype.TextEncoder).EncodeText
+		encoder, ok := t.Value.(pgtype.TextEncoder)
+		if !ok {
+			return unknownEncoderfunc(fmt.Errorf("data type %q does not support text encoding", t.Name))
+		}
+		return encoder.EncodeText
 	case BinaryFormat:
-		return t.Value.(pgtype.BinaryEncoder).EncodeBinary
+		encoder, ok := t.Value.(pgtype.BinaryEncoder)
+		if !ok {
+			return unknownEncoderfunc(fmt.Errorf("data type %q does not support binary encoding", t.Name))
+		}
+		return encoder.EncodeBinary
 	default:
 		return unknownEncoderfunc(fmt.Errorf("unknown format encoder %d", code))
 	}

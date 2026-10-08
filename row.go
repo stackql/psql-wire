@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/jackc/pgtype"
@@ -123,6 +124,14 @@ func (column Column) Write(ctx context.Context, writer buffer.Writer, src interf
 				src = s2
 			}
 		}
+	case *pgtype.Polygon:
+		if polygonText, ok := src.(string); ok {
+			points, err := parsePolygonText(polygonText)
+			if err != nil {
+				return err
+			}
+			src = points
+		}
 	}
 	err = typed.Value.Set(src)
 	if err != nil {
@@ -139,6 +148,31 @@ func (column Column) Write(ctx context.Context, writer buffer.Writer, src interf
 	writer.AddBytes(bb)
 
 	return nil
+}
+
+func parsePolygonText(src string) ([]pgtype.Vec2, error) {
+	if len(src) < 7 || !strings.HasPrefix(src, "((") || !strings.HasSuffix(src, "))") {
+		return nil, fmt.Errorf("invalid polygon representation")
+	}
+
+	parts := strings.Split(src[2:len(src)-2], "),(")
+	points := make([]pgtype.Vec2, 0, len(parts))
+	for _, part := range parts {
+		coordinates := strings.Split(part, ",")
+		if len(coordinates) != 2 {
+			return nil, fmt.Errorf("invalid polygon point %q", part)
+		}
+		x, err := strconv.ParseFloat(coordinates[0], 64)
+		if err != nil {
+			return nil, fmt.Errorf("invalid polygon x coordinate: %w", err)
+		}
+		y, err := strconv.ParseFloat(coordinates[1], 64)
+		if err != nil {
+			return nil, fmt.Errorf("invalid polygon y coordinate: %w", err)
+		}
+		points = append(points, pgtype.Vec2{X: x, Y: y})
+	}
+	return points, nil
 }
 
 // asTextBytes extracts raw bytes from string or []byte sources for text-format

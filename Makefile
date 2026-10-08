@@ -39,6 +39,11 @@ lint: | $(GOLANGCI_LINT) ; $(info $(M) running golint…) @ ## Run the project l
 test: ## Run all tests
 	$Q $(GO) test ./...
 
+.PHONY: fuzz
+fuzz: ## Run one fuzz target (FUZZ_TARGET=FuzzXxx FUZZ_PACKAGE=./pkg TIME=60s)
+	@if [ -z "$(FUZZ_TARGET)" ] || [ -z "$(FUZZ_PACKAGE)" ]; then echo "set FUZZ_TARGET and FUZZ_PACKAGE"; exit 2; fi
+	$Q $(GO) test -run=^$$ -fuzz=^$(FUZZ_TARGET)$$ -fuzztime=$(TIME) -parallel=1 $(FUZZ_PACKAGE)
+
 .PHONY: fmt
 fmt: ; $(info $(M) running gofmt…) @ ## Run gofmt on all source files
 	$Q $(GO) fmt $(PKGS)
