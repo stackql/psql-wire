@@ -237,6 +237,17 @@ func TestColumnWrite_NonString_UsesStandardEncoder(t *testing.T) {
 	}
 }
 
+func TestColumnWrite_PolygonBinaryRejectsMalformedText(t *testing.T) {
+	ctx := setTypeInfo(context.Background())
+	column := Column{Oid: oid.T_polygon, Format: BinaryFormat}
+	writer := buffer.NewWriter(&bytes.Buffer{})
+
+	err := column.Write(ctx, writer, "8000000")
+	if err == nil {
+		t.Fatal("expected malformed polygon text to return an error")
+	}
+}
+
 func TestResolveResultFormat(t *testing.T) {
 	tests := []struct {
 		name    string

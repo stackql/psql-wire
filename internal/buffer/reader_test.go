@@ -174,6 +174,21 @@ func TestGetStringNulTerminatorNotfound(t *testing.T) {
 	}
 }
 
+func TestGetBytesNegativeCount(t *testing.T) {
+	reader := CreateTestReader([]byte("data"), nil)
+
+	value, err := reader.GetBytes(-1)
+	if err == nil {
+		t.Fatal("expected an error for a negative byte count")
+	}
+	if value != nil {
+		t.Fatalf("unexpected result for a negative byte count: %q", value)
+	}
+	if got := string(reader.PeekMsg()); got != "data" {
+		t.Fatalf("negative byte count consumed data: got %q", got)
+	}
+}
+
 func TestGetInsufficientData(t *testing.T) {
 	buffer := bytes.NewBuffer([]byte{})
 	reader := CreateTestReader(

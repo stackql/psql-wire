@@ -37,6 +37,23 @@ func TListenAndServe(t *testing.T, server *Server) *net.TCPAddr {
 	return listener.Addr().(*net.TCPAddr)
 }
 
+func TListenAndServeWithCapture(t *testing.T, server *Server) (*net.TCPAddr, *fuzzRecordingListener) {
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	recording := &fuzzRecordingListener{Listener: listener}
+
+	t.Cleanup(func() {
+		if err := server.Close(); err != nil {
+			t.Fatal(err)
+		}
+	})
+
+	go server.Serve(recording) //nolint:errcheck
+	return listener.Addr().(*net.TCPAddr), recording
+}
+
 func TestClientConnect(t *testing.T) {
 	t.Parallel()
 
@@ -49,7 +66,7 @@ func TestClientConnect(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	address := TListenAndServe(t, server)
+	address, captured := TListenAndServeWithCapture(t, server)
 
 	t.Run("mock", func(t *testing.T) {
 		conn, err := net.Dial("tcp", address.String())
@@ -100,6 +117,8 @@ func TestClientConnect(t *testing.T) {
 			t.Fatal(err)
 		}
 	})
+
+	captured.recordSeeds(t)
 }
 
 func TestZeroRowResultRetainsColumnMetadata(t *testing.T) {

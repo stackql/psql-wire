@@ -1,0 +1,77 @@
+name: Fuzz tests
+
+on:
+  pull_request:
+    branches:
+      - main
+      - develop
+  schedule:
+    - cron: '17 2 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    name: Regression corpus
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
+        with:
+          go-version: '1.25.3'
+      - name: Run regression corpus
+        run: go test ./...
+
+  fuzz:
+    name: ${{ matrix.target }}
+    needs: regression
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: FuzzReader
+            package: ./internal/buffer
+            corpus: internal/buffer/testdata/fuzz/FuzzReader
+          - target: FuzzSplitCompoundQuery
+            package: ./pkg/sqlbackend
+            corpus: pkg/sqlbackend/testdata/fuzz/FuzzSplitCompoundQuery
+          - target: FuzzStartup
+            package: .
+            corpus: testdata/fuzz/FuzzStartup
+          - target: FuzzSessionRaw
+            package: .
+            corpus: testdata/fuzz/FuzzSessionRaw
+          - target: FuzzSessionStructured
+            package: .
+            corpus: testdata/fuzz/FuzzSessionStructured
+          - target: FuzzRowEncoding
+            package: .
+            corpus: testdata/fuzz/FuzzRowEncoding
+    env:
+      FUZZ_TARGET: ${{ matrix.target }}
+      FUZZ_PACKAGE: ${{ matrix.package }}
+      FUZZ_TIME: ${{ github.event_name == 'schedule' && '10m' || '60s' }}
+      GOCACHE: ${{ github.workspace }}/.cache/go-build
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
+        with:
+          go-version: '1.25.3'
+      - uses: actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809 # v4.2.4
+        with:
+          path: ${{ env.GOCACHE }}/fuzz
+          key: fuzz-${{ runner.os }}-${{ matrix.target }}-${{ hashFiles('go.sum') }}
+          restore-keys: |
+            fuzz-${{ runner.os }}-${{ matrix.target }}-
+      - name: Fuzz target
+        id: fuzz
+        run: make fuzz FUZZ_TARGET="$FUZZ_TARGET" FUZZ_PACKAGE="$FUZZ_PACKAGE" TIME="$FUZZ_TIME"
+      - uses: actions/upload-artifact@5d5d22a31266ced268874388b861e4b58bb5c2f3 # v4.3.1
+        if: failure()
+        with:
+          name: fuzz-failure-${{ matrix.target }}
+          path: ${{ matrix.corpus }}/
+          if-no-files-found: ignore
