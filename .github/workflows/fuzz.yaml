@@ -54,7 +54,7 @@ jobs:
       FUZZ_TARGET: ${{ matrix.target }}
       FUZZ_PACKAGE: ${{ matrix.package }}
       FUZZ_TIME: ${{ github.event_name == 'schedule' && '10m' || '60s' }}
-      GOCACHE: ${{ runner.temp }}/go-build
+      GOCACHE: ${{ github.workspace }}/.cache/go-build
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
