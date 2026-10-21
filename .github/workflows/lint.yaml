@@ -15,7 +15,7 @@ on:
       - develop
 
 env:
-  GOLANGCI_LINT_VERSION:  ${{ vars.GOLANGCI_LINT_VERSION == '' && 'v2.5.0' || vars.GOLANGCI_LINT_VERSION }}
+  GOLANGCI_LINT_VERSION:  ${{ vars.GOLANGCI_LINT_VERSION == '' && 'v2.15.0' || vars.GOLANGCI_LINT_VERSION }}
   DEFAULT_STEP_TIMEOUT:   ${{ vars.DEFAULT_STEP_TIMEOUT_MIN == '' && '20' || vars.DEFAULT_STEP_TIMEOUT_MIN }}
 
 jobs:
@@ -29,7 +29,7 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v2
       with:
-        go-version: 1.25.3
+        go-version: 1.27.3
 
     - name: Restore bin
       uses: actions/cache@v4
