@@ -8,7 +8,7 @@ GOBIN		= $(GOPATH)/bin
 GO			?= GOGC=off $(shell which go)
 FUZZ_GO		= $(subst GOGC=off ,,$(GO))
 
-GOLANGCI_LINT_VERSION = v2.5.0
+GOLANGCI_LINT_VERSION = v2.15.0
 
 # Printing
 V = 0
